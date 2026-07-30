@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: pool-back
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    validate-migration-naming: true
+
+server:
+  port: 8080
