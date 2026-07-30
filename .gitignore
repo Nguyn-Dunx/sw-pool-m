@@ -1,0 +1,55 @@
+# =========================
+# Environment & Secrets
+# =========================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# =========================
+# Java / Spring Boot
+# =========================
+target/
+**/target/
+
+*.log
+*.class
+
+# =========================
+# React
+# =========================
+node_modules/
+build/
+dist/
+coverage/
+
+# =========================
+# IntelliJ IDEA
+# =========================
+.idea/
+*.iml
+out/
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# Operating System
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================
+# Docker Local Data
+# =========================
+.data/
+pgdata/
+postgres-data/
+
+# Runtime data
+artifacts/
+.wrangler/
