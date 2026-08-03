@@ -4,5 +4,11 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
+
   jpa:
     show-sql: true
+
+# Cấu hình mức độ log để dễ debug Security
+logging:
+  level:
+    org.springframework.security: DEBUG

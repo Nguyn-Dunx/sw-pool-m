@@ -1,4 +1,7 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   application:
     name: pool-back
 
@@ -19,3 +22,25 @@ spring:
 
 server:
   port: 8080
+
+app:
+  security:
+    # Secret Key dùng để mã hóa Remember Me Token (Trên Production CẦN đổi chuỗi này thành biến môi trường)
+    remember-me-key: ${REMEMBER_ME_KEY:PoolManagementDevRememberMeKey}
+
+    # Timeout của Session đăng nhập (Dev: 60 phút)
+    session-timeout-minutes: 60
+
+    # Hạn sử dụng của Remember Me Cookie
+    remember-me-cookie-max-age-days: 30
+
+    # Cấu hình CSRF cho ReactJS
+    csrf-header-name: "X-XSRF-TOKEN"
+    csrf-cookie-name: "XSRF-TOKEN"
+
+    # Danh sách các domain frontend được phép gọi API (CORS)
+    allowed-origins:
+      - "http://localhost:3000"  # React
+      - "http://localhost:5173"  # Vite
+
+
