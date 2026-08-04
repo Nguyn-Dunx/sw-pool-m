@@ -47,7 +47,7 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
     private final SecurityProperties securityProperties;
-    private final DataSource dataSource; // Inject DB để lưu Persistent Token
+    private final PersistentTokenRepository persistentTokenRepository;
 
 
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
@@ -156,22 +156,13 @@ public class SecurityConfig {
         return new HttpSessionEventPublisher();
     }
 
-    // Cấu hình Persistent Token cho Remember Me
-    // TODO(Spring 7+): Replace JdbcTokenRepositoryImpl because it is deprecated.
-    @Bean
-    public PersistentTokenRepository persistentTokenRepository() {
-        JdbcTokenRepositoryImpl tokenRepository = new JdbcTokenRepositoryImpl();
-        tokenRepository.setDataSource(dataSource);
-        return tokenRepository;
-    }
 
-    // Cấu hình RememberMeServices để liên kết với Filter
     @Bean
     public RememberMeServices rememberMeServices() {
         CustomRememberMeServices services = new CustomRememberMeServices(
                 securityProperties.getRememberMeKey(),
                 userDetailsService,
-                persistentTokenRepository()
+                persistentTokenRepository // Trực tiếp truyền biến đã inject ở trên vào đây
         );
         services.setCookieName(SecurityConstants.REMEMBER_ME_COOKIE_NAME);
         services.setTokenValiditySeconds(securityProperties.getRememberMeMaxAgeSeconds());
