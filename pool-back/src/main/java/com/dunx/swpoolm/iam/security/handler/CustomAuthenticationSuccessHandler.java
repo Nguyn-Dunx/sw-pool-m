@@ -3,10 +3,11 @@ package com.dunx.swpoolm.iam.security.handler;
 import com.dunx.swpoolm.common.dto.ApiResponse;
 import com.dunx.swpoolm.common.i18n.MessageKeys;
 import com.dunx.swpoolm.common.i18n.MessageService;
-import com.dunx.swpoolm.iam.dto.AuthResponse; // Hãy đảm bảo bạn đã tạo DTO này
+import com.dunx.swpoolm.iam.dto.AuthResponse;
+import com.dunx.swpoolm.iam.entity.User;
+import com.dunx.swpoolm.iam.repository.UserRepository;
 import com.dunx.swpoolm.iam.security.CustomUserDetails;
 import com.dunx.swpoolm.iam.service.AuthService;
-import com.dunx.swpoolm.teacher.repository.TeacherRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
+import java.time.Instant;
 
 @Component
 @RequiredArgsConstructor
@@ -25,6 +27,7 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
     private final JsonMapper jsonMapper;
     private final MessageService messageService;
     private final AuthService authService;
+    private final UserRepository userRepository;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
@@ -32,6 +35,11 @@ public class CustomAuthenticationSuccessHandler implements AuthenticationSuccess
         response.setStatus(HttpServletResponse.SC_OK);
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+
+        // Cập nhật thời gian đăng nhập lần cuối
+        User user = userDetails.getUser();
+        user.setLastLogin(Instant.now());
+        userRepository.save(user);
 
         AuthResponse authData = authService.buildAuthResponse(userDetails);
 

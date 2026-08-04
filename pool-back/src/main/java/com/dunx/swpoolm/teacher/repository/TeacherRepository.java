@@ -1,7 +1,11 @@
 package com.dunx.swpoolm.teacher.repository;
 
 import com.dunx.swpoolm.teacher.entity.Teacher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -11,4 +15,9 @@ import java.util.UUID;
 public interface TeacherRepository extends JpaRepository<Teacher, UUID> {
 
     Optional<Teacher> findByUserId(UUID userId);
+
+    @Query("SELECT t FROM Teacher t JOIN t.user u WHERE " +
+            "(:keyword IS NULL OR LOWER(t.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "OR u.phoneNumber LIKE CONCAT('%', :keyword, '%'))")
+    Page<Teacher> searchTeachers(@Param("keyword") String keyword, Pageable pageable);
 }

@@ -1,9 +1,4 @@
 spring:
-  datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-
   jpa:
     show-sql: false
 
@@ -17,3 +12,12 @@ logging:
 
 server:
   forward-headers-strategy: framework
+
+app:
+  security:
+    # BẮT BUỘC phải set biến môi trường này trên Production (không có default)
+    remember-me-key: ${REMEMBER_ME_KEY}
+
+    # Danh sách domain frontend thực tế trên Production
+    allowed-origins:
+      - ${CORS_ALLOWED_ORIGIN:https://your-production-domain.com}

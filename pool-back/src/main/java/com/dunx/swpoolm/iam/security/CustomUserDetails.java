@@ -2,6 +2,7 @@ package com.dunx.swpoolm.iam.security;
 
 import com.dunx.swpoolm.iam.entity.User;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -13,6 +14,7 @@ import java.util.Collections;
 
 @Getter
 @AllArgsConstructor
+@EqualsAndHashCode(of = "user")
 public class CustomUserDetails implements UserDetails {
 
     private final User user;

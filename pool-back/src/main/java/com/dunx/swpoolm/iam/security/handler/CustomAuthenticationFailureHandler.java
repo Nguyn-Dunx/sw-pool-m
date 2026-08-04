@@ -3,6 +3,7 @@ package com.dunx.swpoolm.iam.security.handler;
 import com.dunx.swpoolm.common.dto.ApiResponse;
 import com.dunx.swpoolm.common.i18n.MessageKeys;
 import com.dunx.swpoolm.common.i18n.MessageService;
+import com.dunx.swpoolm.iam.security.filter.ValidationAuthenticationException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,8 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -27,6 +30,31 @@ public class CustomAuthenticationFailureHandler implements AuthenticationFailure
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) throws IOException {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+
+        // Xử lý lỗi Validation riêng — trả 400 Bad Request thay vì 401
+        if (exception instanceof ValidationAuthenticationException validationEx) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+
+            String message = messageService.get(MessageKeys.Auth.INVALID_PAYLOAD);
+
+            List<ApiResponse.ValidationError> errors = validationEx.getValidationErrors().stream()
+                    .map(e -> ApiResponse.ValidationError.builder()
+                            .field(e.get("field"))
+                            .message(e.get("message"))
+                            .build())
+                    .toList();
+
+            ApiResponse<Void> apiResponse = ApiResponse.<Void>builder()
+                    .status(HttpServletResponse.SC_BAD_REQUEST)
+                    .message(message)
+                    .errors(errors)
+                    .build();
+
+            jsonMapper.writeValue(response.getOutputStream(), apiResponse);
+            return;
+        }
+
+        // Các lỗi Authentication khác — trả 401 Unauthorized
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 
         String messageKey;

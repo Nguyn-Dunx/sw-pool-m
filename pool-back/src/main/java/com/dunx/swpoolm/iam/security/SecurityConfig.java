@@ -4,6 +4,7 @@ import com.dunx.swpoolm.common.constant.SecurityConstants;
 import com.dunx.swpoolm.iam.security.filter.JsonAuthenticationFilter;
 import com.dunx.swpoolm.iam.security.handler.*;
 import com.dunx.swpoolm.iam.service.CustomRememberMeServices;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,9 +22,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.RememberMeServices;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.authentication.rememberme.JdbcTokenRepositoryImpl;
-import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices;
 import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository;
+import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.ConcurrentSessionControlAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.RegisterSessionAuthenticationStrategy;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -32,22 +35,22 @@ import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import tools.jackson.databind.json.JsonMapper;
 
-import javax.sql.DataSource;
 import java.util.List;
 
-/**
- * Cấu hình Security chuẩn OWASP cho mô hình Spring Boot + ReactJS (Session-based).
- */
+
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Hỗ trợ @PreAuthorize, @PostAuthorize tại Service Layer
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
     private final SecurityProperties securityProperties;
     private final PersistentTokenRepository persistentTokenRepository;
+    private final Validator validator;
+    private final JsonMapper jsonMapper;
 
 
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
@@ -65,8 +68,13 @@ public class SecurityConfig {
         // 2. Cấu hình CSRF cho ReactJS
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
         requestHandler.setCsrfRequestAttributeName(null);
+
+        CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrfTokenRepository.setCookieName(securityProperties.getCsrfCookieName());
+        csrfTokenRepository.setHeaderName(securityProperties.getCsrfHeaderName());
+
         http.csrf(csrf -> csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRepository(csrfTokenRepository)
                 .csrfTokenRequestHandler(requestHandler)
                 .ignoringRequestMatchers(SecurityConstants.PUBLIC_URLS)
         );
@@ -87,8 +95,7 @@ public class SecurityConfig {
         // 5. Session Management (Cấm đăng nhập đồng thời 2 thiết bị)
         http.sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
-                .sessionFixation().changeSessionId()
-                .maximumSessions(1)
+                .maximumSessions(3)
                 .sessionRegistry(sessionRegistry())
                 .maxSessionsPreventsLogin(false) // Đăng nhập mới sẽ đá đăng nhập cũ ra
         );
@@ -118,13 +125,17 @@ public class SecurityConfig {
         );
 
         // 9. Thêm bộ đọc JSON thay thế cho Form mặc định của Spring
-        JsonAuthenticationFilter jsonAuthFilter = new JsonAuthenticationFilter(authenticationManager);
+        JsonAuthenticationFilter jsonAuthFilter = new JsonAuthenticationFilter(authenticationManager, jsonMapper, validator);
         jsonAuthFilter.setAuthenticationSuccessHandler(successHandler);
         jsonAuthFilter.setAuthenticationFailureHandler(failureHandler);
         jsonAuthFilter.setRememberMeServices(rememberMeServices); // Tích hợp Remember Me vào Filter JSON
 
         // Báo cho Filter biết nơi lưu Session
         jsonAuthFilter.setSecurityContextRepository(securityContextRepository());
+
+        // Gắn chiến lược quản lý Session vào Filter (chống Session Fixation + giới hạn phiên)
+        jsonAuthFilter.setSessionAuthenticationStrategy(sessionAuthenticationStrategy());
+
         // Đặt Filter của chúng ta lên trước Filter mặc định
         http.addFilterAt(jsonAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -154,6 +165,33 @@ public class SecurityConfig {
     @Bean
     public HttpSessionEventPublisher httpSessionEventPublisher() {
         return new HttpSessionEventPublisher();
+    }
+
+    /**
+     * Chiến lược quản lý Session cho custom login filter.
+     * Gồm 3 bước theo đúng thứ tự chuẩn của Spring Security:
+     * 1. Kiểm tra số lượng session đồng thời (max = 3)
+     * 2. Chống Session Fixation (đổi Session ID sau đăng nhập)
+     * 3. Đăng ký Session mới vào SessionRegistry
+     */
+    @Bean
+    public CompositeSessionAuthenticationStrategy sessionAuthenticationStrategy() {
+        ConcurrentSessionControlAuthenticationStrategy concurrentStrategy =
+                new ConcurrentSessionControlAuthenticationStrategy(sessionRegistry());
+        concurrentStrategy.setMaximumSessions(3);
+        concurrentStrategy.setExceptionIfMaximumExceeded(false); // Đăng nhập mới sẽ đá phiên cũ nhất ra
+
+        ChangeSessionIdAuthenticationStrategy sessionFixationStrategy =
+                new ChangeSessionIdAuthenticationStrategy();
+
+        RegisterSessionAuthenticationStrategy registerStrategy =
+                new RegisterSessionAuthenticationStrategy(sessionRegistry());
+
+        return new CompositeSessionAuthenticationStrategy(List.of(
+                concurrentStrategy,
+                sessionFixationStrategy,
+                registerStrategy
+        ));
     }
 
 

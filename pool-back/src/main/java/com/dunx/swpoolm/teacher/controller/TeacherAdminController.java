@@ -1,0 +1,69 @@
+package com.dunx.swpoolm.teacher.controller;
+
+import com.dunx.swpoolm.common.dto.ApiResponse;
+import com.dunx.swpoolm.common.dto.PageResponse;
+import com.dunx.swpoolm.common.i18n.MessageKeys;
+import com.dunx.swpoolm.common.i18n.MessageService;
+import com.dunx.swpoolm.teacher.dto.TeacherCreateRequest;
+import com.dunx.swpoolm.teacher.dto.TeacherResponse;
+import com.dunx.swpoolm.teacher.dto.TeacherUpdateRequest;
+import com.dunx.swpoolm.teacher.service.TeacherService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/admin/teachers")
+@RequiredArgsConstructor
+public class TeacherAdminController {
+
+    private final TeacherService teacherService;
+    private final MessageService messageService;
+
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<TeacherResponse>> createTeacher(
+            @Valid @RequestBody TeacherCreateRequest request) { // @Valid để kích hoạt validate DTO
+
+        TeacherResponse response = teacherService.createTeacher(request);
+
+        String message = messageService.get(MessageKeys.Common.CREATED);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response, message));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<PageResponse<TeacherResponse>>> getTeachers(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        PageResponse<TeacherResponse> response = teacherService.getTeachers(keyword, page, size);
+        return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<TeacherResponse>> updateTeacher(
+            @PathVariable UUID id,
+            @Valid @RequestBody TeacherUpdateRequest request) {
+
+        TeacherResponse response = teacherService.updateTeacher(id, request);
+        return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.UPDATED)));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteTeacher(@PathVariable UUID id) {
+        teacherService.deleteTeacher(id);
+        return ResponseEntity.ok(ApiResponse.success(null, messageService.get(MessageKeys.Common.DELETED)));
+    }
+}

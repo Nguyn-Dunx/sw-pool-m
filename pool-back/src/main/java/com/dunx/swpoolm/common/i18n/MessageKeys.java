@@ -76,4 +76,14 @@ public class MessageKeys {
         public static final String LENGTH =
                 "validation.length";
     }
+
+    @UtilityClass
+    public static class Role {
+        public static final String NOT_FOUND = "error.role.not_found";
+    }
+
+    @UtilityClass
+    public static class Teacher {
+        public static final String NOT_FOUND = "error.teacher.not_found";
+    }
 }
