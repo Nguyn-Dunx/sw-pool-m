@@ -108,4 +108,11 @@ public class MessageKeys {
         public static final String QUOTA_EXCEEDED = "error.attendance.quota_exceeded";
         public static final String UNAUTHORIZED = "error.attendance.unauthorized";
     }
+
+    @UtilityClass
+    public static class EnrollmentRequest {
+        public static final String NOT_FOUND = "error.enrollment_request.not_found";
+        public static final String ALREADY_REVIEWED = "error.enrollment_request.already_reviewed";
+        public static final String DUPLICATE_PENDING = "error.enrollment_request.duplicate_pending";
+    }
 }

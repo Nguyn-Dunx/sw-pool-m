@@ -5,6 +5,7 @@ import com.dunx.swpoolm.common.exception.ResourceNotFoundException;
 import com.dunx.swpoolm.common.i18n.MessageKeys;
 import com.dunx.swpoolm.operation.dto.EnrollmentCreateRequest;
 import com.dunx.swpoolm.operation.dto.EnrollmentResponse;
+import com.dunx.swpoolm.operation.dto.EnrollmentUpdateRequest;
 import com.dunx.swpoolm.operation.entity.Enrollment;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
 import com.dunx.swpoolm.operation.repository.EnrollmentRepository;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -87,16 +89,66 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
         List<String> teacherNames = teachers.stream().map(Teacher::getFullName).toList();
 
+        return mapToResponse(savedEnrollment, student.getFullName(), teacherNames);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public EnrollmentResponse updateEnrollment(UUID enrollmentId, EnrollmentUpdateRequest request) {
+
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Common.NOT_FOUND));
+
+        // Cập nhật danh sách giáo viên
+        if (request.getTeacherIds() != null && !request.getTeacherIds().isEmpty()) {
+            List<Teacher> teachers = teacherRepository.findAllById(request.getTeacherIds());
+            if (teachers.size() != request.getTeacherIds().size()) {
+                throw new AppException(MessageKeys.Enrollment.TEACHER_NOT_FOUND);
+            }
+            boolean hasInactiveTeacher = teachers.stream()
+                    .anyMatch(t -> t.getStatus() != TeacherStatus.ACTIVE);
+            if (hasInactiveTeacher) {
+                throw new AppException(MessageKeys.Enrollment.TEACHER_INACTIVE);
+            }
+            enrollment.setTeachers(new HashSet<>(teachers));
+        }
+
+        // Cập nhật cam kết
+        if (request.getIsGuaranteed() != null) {
+            enrollment.setIsGuaranteed(request.getIsGuaranteed());
+        }
+
+        // Cập nhật kiểu bơi (kiểm tra trùng nếu thay đổi)
+        if (request.getSwimStyle() != null && request.getSwimStyle() != enrollment.getSwimStyle()) {
+            boolean isDuplicate = enrollmentRepository.existsByStudentIdAndSwimStyleAndStatus(
+                    enrollment.getStudent().getId(), request.getSwimStyle(), EnrollmentStatus.ACTIVE);
+            if (isDuplicate) {
+                throw new AppException(MessageKeys.Enrollment.DUPLICATE_ACTIVE_STYLE);
+            }
+            enrollment.setSwimStyle(request.getSwimStyle());
+        }
+
+        Enrollment savedEnrollment = enrollmentRepository.save(enrollment);
+        List<String> teacherNames = savedEnrollment.getTeachers().stream()
+                .map(Teacher::getFullName).toList();
+
+        log.info("Admin đã cập nhật Enrollment {} cho học viên {}",
+                enrollmentId, enrollment.getStudent().getFullName());
+
+        return mapToResponse(savedEnrollment, enrollment.getStudent().getFullName(), teacherNames);
+    }
+
+    private EnrollmentResponse mapToResponse(Enrollment enrollment, String studentName, List<String> teacherNames) {
         return EnrollmentResponse.builder()
-                .id(savedEnrollment.getId())
-                .studentName(student.getFullName())
+                .id(enrollment.getId())
+                .studentName(studentName)
                 .teacherNames(teacherNames)
-                .swimStyle(savedEnrollment.getSwimStyle())
-                .isGuaranteed(savedEnrollment.getIsGuaranteed())
-                .totalQuota(savedEnrollment.getTotalQuota())
-                .startDate(savedEnrollment.getStartDate())
-                .expireDate(savedEnrollment.getExpireDate())
-                .status(savedEnrollment.getStatus())
+                .swimStyle(enrollment.getSwimStyle())
+                .isGuaranteed(enrollment.getIsGuaranteed())
+                .totalQuota(enrollment.getTotalQuota())
+                .startDate(enrollment.getStartDate())
+                .expireDate(enrollment.getExpireDate())
+                .status(enrollment.getStatus())
                 .build();
     }
 }

@@ -6,7 +6,9 @@ import com.dunx.swpoolm.common.i18n.MessageKeys;
 import com.dunx.swpoolm.student.dto.StudentCreateRequest;
 import com.dunx.swpoolm.student.dto.StudentResponse;
 import com.dunx.swpoolm.student.dto.StudentUpdateRequest;
+import com.dunx.swpoolm.student.dto.TeacherStudentCreateRequest;
 import com.dunx.swpoolm.student.entity.Student;
+import com.dunx.swpoolm.student.enums.SourceType;
 import com.dunx.swpoolm.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +41,22 @@ public class StudentServiceImpl implements StudentService {
 
         Student savedStudent = studentRepository.save(student);
         log.info("Đã tạo mới học viên: {}", savedStudent.getFullName());
+
+        return mapToResponse(savedStudent);
+    }
+
+    @Override
+    @Transactional
+    public StudentResponse createStudentByTeacher(TeacherStudentCreateRequest request) {
+        Student student = Student.builder()
+                .fullName(request.getFullName())
+                .phoneNumber(request.getPhoneNumber())
+                .dob(request.getDob())
+                .sourceType(SourceType.TEACHER) // Tự động set = TEACHER
+                .build();
+
+        Student savedStudent = studentRepository.save(student);
+        log.info("Giáo viên đã tạo mới học viên: {}", savedStudent.getFullName());
 
         return mapToResponse(savedStudent);
     }
