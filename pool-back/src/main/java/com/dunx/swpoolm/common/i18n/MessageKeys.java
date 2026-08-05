@@ -86,4 +86,26 @@ public class MessageKeys {
     public static class Teacher {
         public static final String NOT_FOUND = "error.teacher.not_found";
     }
+
+    @UtilityClass
+    public static class Student {
+        public static final String NOT_FOUND = "error.student.not_found";
+    }
+
+    @UtilityClass
+    public static class Enrollment {
+        public static final String TEACHER_INACTIVE = "error.enrollment.teacher_inactive";
+        public static final String TEACHER_NOT_FOUND = "error.enrollment.teacher_not_found";
+        public static final String DUPLICATE_ACTIVE_STYLE = "error.enrollment.duplicate_active_style";
+        public static final String EMPTY_TEACHERS = "error.enrollment.empty_teachers";
+    }
+
+    @UtilityClass
+    public static class Attendance {
+        public static final String FUTURE_DATE = "error.attendance.future_date";
+        public static final String INVALID_DATE = "error.attendance.invalid_date";
+        public static final String DUPLICATE = "error.attendance.duplicate";
+        public static final String QUOTA_EXCEEDED = "error.attendance.quota_exceeded";
+        public static final String UNAUTHORIZED = "error.attendance.unauthorized";
+    }
 }

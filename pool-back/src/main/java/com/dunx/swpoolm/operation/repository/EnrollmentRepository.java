@@ -2,6 +2,7 @@ package com.dunx.swpoolm.operation.repository;
 
 import com.dunx.swpoolm.operation.entity.Enrollment;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
+import com.dunx.swpoolm.operation.enums.SwimStyle;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,4 +22,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     List<Enrollment> findExpiringEnrollments(@Param("warningDate") LocalDate warningDate);
 
     List<Enrollment> findByStatusAndExpireDateBefore(EnrollmentStatus status, LocalDate date);
+
+    boolean existsByStudentIdAndSwimStyleAndStatus(UUID studentId, SwimStyle swimStyle, EnrollmentStatus status);
 }
