@@ -115,4 +115,10 @@ public class MessageKeys {
         public static final String ALREADY_REVIEWED = "error.enrollment_request.already_reviewed";
         public static final String DUPLICATE_PENDING = "error.enrollment_request.duplicate_pending";
     }
+
+    @UtilityClass
+    public static class Alert {
+        public static final String EXPIRING_SOON = "alert.expiring_soon";
+        public static final String ABSENT = "alert.absent";
+    }
 }

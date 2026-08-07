@@ -68,7 +68,7 @@ CREATE TABLE enrollment_teachers (
     enrollment_id UUID NOT NULL,
     teacher_id UUID NOT NULL,
     assigned_date DATE DEFAULT CURRENT_DATE,
-    
+
     PRIMARY KEY (enrollment_id, teacher_id), -- Đảm bảo không trùng lặp
     CONSTRAINT fk_et_enrollment FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE,
     CONSTRAINT fk_et_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE

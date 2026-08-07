@@ -1,26 +1,37 @@
 package com.dunx.swpoolm.operation.service;
 
+import com.dunx.swpoolm.common.dto.PageResponse;
 import com.dunx.swpoolm.common.exception.AppException;
 import com.dunx.swpoolm.common.exception.ResourceNotFoundException;
 import com.dunx.swpoolm.common.i18n.MessageKeys;
 import com.dunx.swpoolm.operation.dto.AttendanceCreateRequest;
+import com.dunx.swpoolm.operation.dto.AttendanceHistoryResponse;
 import com.dunx.swpoolm.operation.dto.AttendanceResponse;
+import com.dunx.swpoolm.operation.dto.TeacherDashboardResponse;
 import com.dunx.swpoolm.operation.entity.AttendanceRecord;
 import com.dunx.swpoolm.operation.entity.Enrollment;
 import com.dunx.swpoolm.operation.entity.Shift;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
 import com.dunx.swpoolm.operation.repository.AttendanceRecordRepository;
+import com.dunx.swpoolm.operation.repository.EnrollmentAttendanceCount;
 import com.dunx.swpoolm.operation.repository.EnrollmentRepository;
 import com.dunx.swpoolm.operation.repository.ShiftRepository;
 import com.dunx.swpoolm.teacher.entity.Teacher;
 import com.dunx.swpoolm.teacher.repository.TeacherRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -101,5 +112,98 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
                 .currentSessionCount((int) newSessionCount)
                 .note(savedRecord.getNote())
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<TeacherDashboardResponse> getMyStudents(UUID userId, int page, int size) {
+        Teacher teacher = teacherRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+
+        Page<Enrollment> enrollmentPage = enrollmentRepository.findActiveEnrollmentsByTeacher(teacher.getId(), pageable);
+
+        if (enrollmentPage.isEmpty()) {
+            return PageResponse.<TeacherDashboardResponse>builder()
+                    .items(List.of())
+                    .pageNumber(page)
+                    .pageSize(size)
+                    .totalElements(0)
+                    .totalPages(0)
+                    .isLast(true)
+                    .build();
+        }
+
+        List<UUID> enrollmentIds = enrollmentPage.getContent().stream()
+                .map(Enrollment::getId)
+                .toList();
+
+        List<EnrollmentAttendanceCount> counts = attendanceRepository.countAttendancesForEnrollments(enrollmentIds);
+
+        Map<UUID, Long> attendanceCountMap = counts.stream()
+                .collect(Collectors.toMap(
+                        EnrollmentAttendanceCount::getEnrollmentId,
+                        EnrollmentAttendanceCount::getSessionCount));
+
+        LocalDate today = LocalDate.now();
+
+        // 4. Lắp ráp dữ liệu trả về cho Frontend
+        List<TeacherDashboardResponse> responses = enrollmentPage.getContent().stream().map(enrollment -> {
+            int attended = attendanceCountMap.getOrDefault(enrollment.getId(), 0L).intValue();
+            int total = enrollment.getTotalQuota();
+            int percent = (int) Math.round((double) attended / total * 100);
+            long daysRemaining = ChronoUnit.DAYS.between(today, enrollment.getExpireDate());
+
+            return TeacherDashboardResponse.builder()
+                    .enrollmentId(enrollment.getId())
+                    .studentName(enrollment.getStudent().getFullName())
+                    .swimStyle(enrollment.getSwimStyle())
+                    .isGuaranteed(enrollment.getIsGuaranteed())
+                    .totalQuota(total)
+                    .attendedSessions(attended)
+                    .progressPercentage(Math.min(percent, 100)) // Chặn quá 100% nếu là học bù
+                    .expireDate(enrollment.getExpireDate())
+                    .daysRemaining(daysRemaining)
+                    .build();
+        }).toList();
+
+        return PageResponse.<TeacherDashboardResponse>builder()
+                .items(responses)
+                .pageNumber(page)
+                .pageSize(size)
+                .totalElements(enrollmentPage.getTotalElements())
+                .totalPages(enrollmentPage.getTotalPages())
+                .isLast(enrollmentPage.isLast())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AttendanceHistoryResponse> getStudentHistory(UUID userId, UUID enrollmentId) {
+        Teacher teacher = teacherRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
+
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Common.NOT_FOUND));
+
+        //check teacher
+        boolean isAssigned = enrollment.getTeachers().stream()
+                .anyMatch(t -> t.getId().equals(teacher.getId()));
+        if (!isAssigned) {
+            throw new AppException(MessageKeys.Attendance.UNAUTHORIZED);
+        }
+
+        return attendanceRepository.findByEnrollmentIdOrderByAttendDateDesc(enrollmentId)
+                .stream().map(record -> {
+                    String shiftTime = record.getShift().getStartTime() + " - " + record.getShift().getEndTime();
+                    return AttendanceHistoryResponse.builder()
+                            .attendanceId(record.getId())
+                            .attendDate(record.getAttendDate())
+                            .shiftTime(shiftTime)
+                            .checkedInBy(record.getTeacher().getFullName())
+                            .note(record.getNote())
+                            .build();
+                }).toList();
     }
 }

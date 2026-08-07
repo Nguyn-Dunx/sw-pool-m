@@ -49,3 +49,10 @@ app:
       - "http://localhost:3000"  # React
       - "http://localhost:5173"  # Vite
 
+poolm:
+  alert:
+    expire-threshold-days: 5
+    absent-threshold-days: 7
+  enrollment:
+    duration-days: 45
+    default-total-quota: 12
