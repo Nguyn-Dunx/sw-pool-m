@@ -7,6 +7,7 @@ import com.dunx.swpoolm.common.i18n.MessageService;
 import com.dunx.swpoolm.iam.security.CustomUserDetails;
 import com.dunx.swpoolm.operation.dto.EnrollmentRequestCreateDTO;
 import com.dunx.swpoolm.operation.dto.EnrollmentRequestResponse;
+import com.dunx.swpoolm.operation.enums.RequestType;
 import com.dunx.swpoolm.operation.service.EnrollmentRequestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -42,13 +43,14 @@ public class EnrollmentRequestController {
     @GetMapping
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ApiResponse<PageResponse<EnrollmentRequestResponse>>> getMyRequests(
+            @RequestParam(required = false) RequestType requestType,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             Authentication authentication) {
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         PageResponse<EnrollmentRequestResponse> response = enrollmentRequestService.getRequestsByTeacher(
-                userDetails.getUser().getId(), page, size);
+                userDetails.getUser().getId(), requestType, page, size);
 
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }

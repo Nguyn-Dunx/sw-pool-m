@@ -7,6 +7,7 @@ import com.dunx.swpoolm.common.i18n.MessageService;
 import com.dunx.swpoolm.operation.dto.EnrollmentRequestResponse;
 import com.dunx.swpoolm.operation.dto.EnrollmentRequestReviewDTO;
 import com.dunx.swpoolm.operation.enums.RequestStatus;
+import com.dunx.swpoolm.operation.enums.RequestType;
 import com.dunx.swpoolm.operation.service.EnrollmentRequestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,12 +29,13 @@ public class EnrollmentRequestAdminController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PageResponse<EnrollmentRequestResponse>>> getRequests(
             @RequestParam(required = false) RequestStatus status,
+            @RequestParam(required = false) RequestType requestType,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         RequestStatus filterStatus = (status != null) ? status : RequestStatus.PENDING;
         PageResponse<EnrollmentRequestResponse> response = enrollmentRequestService.getRequestsByStatus(
-                filterStatus, page, size);
+                filterStatus, requestType, page, size);
 
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }

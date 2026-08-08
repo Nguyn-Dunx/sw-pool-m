@@ -2,6 +2,7 @@ package com.dunx.swpoolm.operation.entity;
 
 import com.dunx.swpoolm.common.entity.BaseEntity;
 import com.dunx.swpoolm.operation.enums.RequestStatus;
+import com.dunx.swpoolm.operation.enums.RequestType;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import com.dunx.swpoolm.student.entity.Student;
 import com.dunx.swpoolm.teacher.entity.Teacher;
@@ -11,6 +12,7 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "enrollment_requests")
@@ -49,6 +51,24 @@ public class EnrollmentRequest extends BaseEntity {
     @Column(name = "status", length = 20)
     @Builder.Default
     private RequestStatus status = RequestStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "request_type", length = 20)
+    @Builder.Default
+    private RequestType requestType = RequestType.CREATE;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "target_enrollment_id")
+    private Enrollment targetEnrollment;
+
+    @Column(name = "total_quota")
+    private Integer totalQuota;
+
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "expire_date")
+    private LocalDate expireDate;
 
     @Column(name = "reviewed_at")
     private Instant reviewedAt;

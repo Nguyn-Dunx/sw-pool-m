@@ -5,9 +5,11 @@ import com.dunx.swpoolm.common.exception.AppException;
 import com.dunx.swpoolm.common.exception.ResourceNotFoundException;
 import com.dunx.swpoolm.common.i18n.MessageKeys;
 import com.dunx.swpoolm.operation.dto.*;
+import com.dunx.swpoolm.operation.entity.Enrollment;
 import com.dunx.swpoolm.operation.entity.EnrollmentRequest;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
 import com.dunx.swpoolm.operation.enums.RequestStatus;
+import com.dunx.swpoolm.operation.enums.RequestType;
 import com.dunx.swpoolm.operation.repository.EnrollmentRepository;
 import com.dunx.swpoolm.operation.repository.EnrollmentRequestRepository;
 import com.dunx.swpoolm.student.entity.Student;
@@ -43,58 +45,92 @@ public class EnrollmentRequestServiceImpl implements EnrollmentRequestService {
     @Transactional
     public EnrollmentRequestResponse createRequest(UUID userId, EnrollmentRequestCreateDTO request) {
 
-        // Tìm Teacher từ userId đang đăng nhập
         Teacher teacher = teacherRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
 
-        Student student = studentRepository.findById(request.getStudentId())
-                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Student.NOT_FOUND));
-
-        // Kiểm tra trùng: không cho tạo yêu cầu PENDING cùng kiểu bơi cho cùng học viên
-        boolean isDuplicate = enrollmentRequestRepository.existsByStudentIdAndSwimStyleAndStatusIn(
-                student.getId(), request.getSwimStyle(), Set.of(RequestStatus.PENDING));
-        if (isDuplicate) {
-            throw new AppException(MessageKeys.EnrollmentRequest.DUPLICATE_PENDING);
-        }
-
-        // Kiểm tra trùng: học viên đã có enrollment ACTIVE cùng kiểu bơi chưa
-        boolean hasActiveEnrollment = enrollmentRepository.existsByStudentIdAndSwimStyleAndStatus(
-                student.getId(), request.getSwimStyle(), EnrollmentStatus.ACTIVE);
-        if (hasActiveEnrollment) {
-            throw new AppException(MessageKeys.Enrollment.DUPLICATE_ACTIVE_STYLE);
-        }
-
         EnrollmentRequest enrollmentRequest = EnrollmentRequest.builder()
-                .student(student)
                 .teacher(teacher)
-                .swimStyle(request.getSwimStyle())
+                .requestType(request.getRequestType())
                 .isGuaranteed(request.getIsGuaranteed())
                 .note(request.getNote())
+                .totalQuota(request.getTotalQuota())
+                .startDate(request.getStartDate())
+                .expireDate(request.getExpireDate())
                 .status(RequestStatus.PENDING)
                 .build();
 
+        if (request.getRequestType() == RequestType.CREATE) {
+            // Logic cho CREATE
+            if (request.getStudentId() == null || request.getSwimStyle() == null) {
+                throw new AppException(MessageKeys.Common.BAD_REQUEST); // TODO: Add specific message key
+            }
+
+            Student student = studentRepository.findById(request.getStudentId())
+                    .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Student.NOT_FOUND));
+
+            boolean isDuplicate = enrollmentRequestRepository.existsByStudentIdAndSwimStyleAndStatusIn(
+                    student.getId(), request.getSwimStyle(), Set.of(RequestStatus.PENDING));
+            if (isDuplicate) {
+                throw new AppException(MessageKeys.EnrollmentRequest.DUPLICATE_PENDING);
+            }
+
+            boolean hasActiveEnrollment = enrollmentRepository.existsByStudentIdAndSwimStyleAndStatus(
+                    student.getId(), request.getSwimStyle(), EnrollmentStatus.ACTIVE);
+            if (hasActiveEnrollment) {
+                throw new AppException(MessageKeys.Enrollment.DUPLICATE_ACTIVE_STYLE);
+            }
+
+            enrollmentRequest.setStudent(student);
+            enrollmentRequest.setSwimStyle(request.getSwimStyle());
+
+        } else if (request.getRequestType() == RequestType.UPDATE) {
+            // Logic cho UPDATE
+            if (request.getTargetEnrollmentId() == null) {
+                throw new AppException(MessageKeys.Common.BAD_REQUEST); // Cần có target
+            }
+
+            Enrollment targetEnrollment = enrollmentRepository.findById(request.getTargetEnrollmentId())
+                    .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Common.NOT_FOUND));
+            
+            // Không cho tạo yêu cầu update nếu khóa đã đóng/hết hạn
+            if (targetEnrollment.getStatus() != EnrollmentStatus.ACTIVE) {
+                 throw new AppException(MessageKeys.Enrollment.CANNOT_UPDATE_FINISHED);
+            }
+
+            // Kiểm tra trùng: không cho tạo 2 yêu cầu update cho cùng 1 khóa học
+            boolean isDuplicate = enrollmentRequestRepository.existsByTargetEnrollmentIdAndStatusIn(
+                    targetEnrollment.getId(), Set.of(RequestStatus.PENDING));
+            if (isDuplicate) {
+                 throw new AppException(MessageKeys.EnrollmentRequest.DUPLICATE_PENDING);
+            }
+
+            enrollmentRequest.setTargetEnrollment(targetEnrollment);
+            enrollmentRequest.setStudent(targetEnrollment.getStudent());
+            enrollmentRequest.setSwimStyle(targetEnrollment.getSwimStyle());
+        }
+
         EnrollmentRequest saved = enrollmentRequestRepository.save(enrollmentRequest);
-        log.info("Teacher {} đã gửi yêu cầu đăng ký khóa {} cho học viên {}",
-                teacher.getFullName(), request.getSwimStyle(), student.getFullName());
+        log.info("Teacher {} đã gửi yêu cầu {} khóa {} cho học viên {}",
+                teacher.getFullName(), request.getRequestType(), saved.getSwimStyle(), saved.getStudent().getFullName());
 
         return mapToResponse(saved);
     }
 
     @Override
-    public PageResponse<EnrollmentRequestResponse> getRequestsByTeacher(UUID userId, int page, int size) {
+    public PageResponse<EnrollmentRequestResponse> getRequestsByTeacher(UUID userId, RequestType requestType, int page, int size) {
         Teacher teacher = teacherRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
 
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
-        Page<EnrollmentRequest> requestPage = enrollmentRequestRepository.findByTeacherId(teacher.getId(), pageable);
+        Page<EnrollmentRequest> requestPage = enrollmentRequestRepository.findByTeacherIdAndType(teacher.getId(), requestType, pageable);
 
         return buildPageResponse(requestPage, page, size);
     }
 
     @Override
-    public PageResponse<EnrollmentRequestResponse> getRequestsByStatus(RequestStatus status, int page, int size) {
+    public PageResponse<EnrollmentRequestResponse> getRequestsByStatus(RequestStatus status, RequestType requestType, int page, int size) {
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
-        Page<EnrollmentRequest> requestPage = enrollmentRequestRepository.findByStatus(status, pageable);
+        Page<EnrollmentRequest> requestPage = enrollmentRequestRepository.findByStatusAndType(status, requestType, pageable);
 
         return buildPageResponse(requestPage, page, size);
     }
@@ -105,12 +141,10 @@ public class EnrollmentRequestServiceImpl implements EnrollmentRequestService {
         EnrollmentRequest enrollmentRequest = enrollmentRequestRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.EnrollmentRequest.NOT_FOUND));
 
-        // Chỉ được duyệt yêu cầu đang PENDING
         if (enrollmentRequest.getStatus() != RequestStatus.PENDING) {
             throw new AppException(MessageKeys.EnrollmentRequest.ALREADY_REVIEWED);
         }
 
-        // Không cho phép set lại PENDING
         if (reviewDTO.getStatus() == RequestStatus.PENDING) {
             throw new AppException(MessageKeys.EnrollmentRequest.ALREADY_REVIEWED);
         }
@@ -119,22 +153,43 @@ public class EnrollmentRequestServiceImpl implements EnrollmentRequestService {
         enrollmentRequest.setAdminNote(reviewDTO.getAdminNote());
         enrollmentRequest.setReviewedAt(Instant.now());
 
-        // Nếu APPROVED → tự động tạo Enrollment
         if (reviewDTO.getStatus() == RequestStatus.APPROVED) {
-            if (reviewDTO.getTeacherIds() == null || reviewDTO.getTeacherIds().isEmpty()) {
-                throw new AppException(MessageKeys.Enrollment.EMPTY_TEACHERS);
+            
+            // Lấy values ưu tiên từ ReviewDTO (Admin sửa), nếu null thì lấy từ Request (Teacher đề xuất)
+            Integer finalQuota = reviewDTO.getTotalQuota() != null ? reviewDTO.getTotalQuota() : enrollmentRequest.getTotalQuota();
+            java.time.LocalDate finalStartDate = reviewDTO.getStartDate() != null ? reviewDTO.getStartDate() : enrollmentRequest.getStartDate();
+            java.time.LocalDate finalExpireDate = reviewDTO.getExpireDate() != null ? reviewDTO.getExpireDate() : enrollmentRequest.getExpireDate();
+
+            if (enrollmentRequest.getRequestType() == RequestType.CREATE) {
+                if (reviewDTO.getTeacherIds() == null || reviewDTO.getTeacherIds().isEmpty()) {
+                    throw new AppException(MessageKeys.Enrollment.EMPTY_TEACHERS);
+                }
+
+                EnrollmentCreateRequest createRequest = new EnrollmentCreateRequest();
+                createRequest.setStudentId(enrollmentRequest.getStudent().getId());
+                createRequest.setSwimStyle(enrollmentRequest.getSwimStyle());
+                createRequest.setIsGuaranteed(enrollmentRequest.getIsGuaranteed());
+                createRequest.setTeacherIds(reviewDTO.getTeacherIds());
+                createRequest.setTotalQuota(finalQuota);
+                createRequest.setStartDate(finalStartDate);
+                createRequest.setExpireDate(finalExpireDate);
+
+                enrollmentService.createEnrollment(createRequest);
+
+            } else if (enrollmentRequest.getRequestType() == RequestType.UPDATE) {
+                
+                EnrollmentUpdateRequest updateRequest = new EnrollmentUpdateRequest();
+                updateRequest.setTeacherIds(reviewDTO.getTeacherIds()); // Có thể null
+                updateRequest.setIsGuaranteed(enrollmentRequest.getIsGuaranteed());
+                updateRequest.setTotalQuota(finalQuota);
+                updateRequest.setExpireDate(finalExpireDate);
+                // startDate không thể sửa bằng updateEnrollment
+
+                enrollmentService.updateEnrollment(enrollmentRequest.getTargetEnrollment().getId(), updateRequest);
             }
 
-            EnrollmentCreateRequest createRequest = new EnrollmentCreateRequest();
-            createRequest.setStudentId(enrollmentRequest.getStudent().getId());
-            createRequest.setSwimStyle(enrollmentRequest.getSwimStyle());
-            createRequest.setIsGuaranteed(enrollmentRequest.getIsGuaranteed());
-            createRequest.setTeacherIds(reviewDTO.getTeacherIds());
-
-            enrollmentService.createEnrollment(createRequest);
-
-            log.info("Admin đã duyệt yêu cầu {} — Enrollment tạo tự động cho học viên {}",
-                    requestId, enrollmentRequest.getStudent().getFullName());
+            log.info("Admin đã duyệt yêu cầu {} ({}) cho học viên {}",
+                    requestId, enrollmentRequest.getRequestType(), enrollmentRequest.getStudent().getFullName());
         } else {
             log.info("Admin đã từ chối yêu cầu {} — Lý do: {}",
                     requestId, reviewDTO.getAdminNote());
@@ -156,6 +211,11 @@ public class EnrollmentRequestServiceImpl implements EnrollmentRequestService {
                 .note(request.getNote())
                 .adminNote(request.getAdminNote())
                 .status(request.getStatus())
+                .requestType(request.getRequestType())
+                .targetEnrollmentId(request.getTargetEnrollment() != null ? request.getTargetEnrollment().getId() : null)
+                .totalQuota(request.getTotalQuota())
+                .startDate(request.getStartDate())
+                .expireDate(request.getExpireDate())
                 .createdAt(request.getCreatedAt())
                 .reviewedAt(request.getReviewedAt())
                 .build();

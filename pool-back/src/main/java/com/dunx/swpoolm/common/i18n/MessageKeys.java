@@ -16,6 +16,7 @@ public class MessageKeys {
         public static final String INTERNAL_SERVER = "error.internal_server";
         public static final String VALIDATION = "error.validation";
         public static final String ACCESS_DENIED = "error.access_denied";
+        public static final String BAD_REQUEST = "error.bad_request";
     }
 
     @UtilityClass
