@@ -98,6 +98,8 @@ public class MessageKeys {
         public static final String TEACHER_NOT_FOUND = "error.enrollment.teacher_not_found";
         public static final String DUPLICATE_ACTIVE_STYLE = "error.enrollment.duplicate_active_style";
         public static final String EMPTY_TEACHERS = "error.enrollment.empty_teachers";
+        public static final String INVALID_DATES = "error.enrollment.invalid_dates";
+        public static final String CANNOT_UPDATE_FINISHED = "error.enrollment.cannot_update_finished";
     }
 
     @UtilityClass
@@ -120,5 +122,10 @@ public class MessageKeys {
     public static class Alert {
         public static final String EXPIRING_SOON = "alert.expiring_soon";
         public static final String ABSENT = "alert.absent";
+    }
+
+    @UtilityClass
+    public static class Setting {
+        public static final String NOT_FOUND = "error.setting.not_found";
     }
 }

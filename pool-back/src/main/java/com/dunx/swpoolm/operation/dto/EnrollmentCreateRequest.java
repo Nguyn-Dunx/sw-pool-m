@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
 
@@ -22,4 +23,9 @@ public class EnrollmentCreateRequest {
 
     @NotNull(message = "{validation.required}")
     private Boolean isGuaranteed;
+
+    // Optional — Nếu null → lấy từ Settings
+    private Integer totalQuota;
+    private LocalDate startDate;
+    private LocalDate expireDate;
 }

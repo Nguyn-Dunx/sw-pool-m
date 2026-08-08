@@ -94,4 +94,26 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             @Param("teacherId") UUID teacherId,
             @Param("thresholdDate") LocalDate thresholdDate);
 
+    // Admin: Danh sách Enrollment phân trang, filter nhiều tiêu chí
+    @Query("SELECT e FROM Enrollment e JOIN FETCH e.student " +
+            "WHERE (:status IS NULL OR e.status = :status) " +
+            "AND (:swimStyle IS NULL OR e.swimStyle = :swimStyle) " +
+            "AND (:studentName IS NULL OR LOWER(e.student.fullName) LIKE LOWER(CONCAT('%', :studentName, '%'))) " +
+            "ORDER BY e.createdAt DESC")
+    Page<Enrollment> findAllWithFilters(
+            @Param("status") EnrollmentStatus status,
+            @Param("swimStyle") SwimStyle swimStyle,
+            @Param("studentName") String studentName,
+            Pageable pageable);
+
+    // Admin: Danh sách Enrollment filter theo teacherId
+    @Query("SELECT e FROM Enrollment e JOIN FETCH e.student JOIN e.teachers t " +
+            "WHERE t.id = :teacherId " +
+            "AND (:status IS NULL OR e.status = :status) " +
+            "ORDER BY e.createdAt DESC")
+    Page<Enrollment> findAllByTeacherWithFilters(
+            @Param("teacherId") UUID teacherId,
+            @Param("status") EnrollmentStatus status,
+            Pageable pageable);
+
 }
