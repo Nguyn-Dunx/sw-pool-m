@@ -310,11 +310,45 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
         LocalDate absentThreshold = today.minusDays(7);
         long absentStudents = enrollmentRepository.findAbsentEnrollmentsByTeacher(teacherId, absentThreshold).size();
 
+        java.util.List<com.dunx.swpoolm.operation.dto.TeacherDashboardSummaryResponse.MonthlyChartData> chartData = new java.util.ArrayList<>();
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("MM/yyyy");
+
+        for (int i = 5; i >= 0; i--) {
+            LocalDate monthDate = today.minusMonths(i);
+            LocalDate start = monthDate.withDayOfMonth(1);
+            LocalDate end = monthDate.withDayOfMonth(monthDate.lengthOfMonth());
+
+            long count = attendanceRepository.countByTeacherIdAndAttendDateBetween(teacherId, start, end);
+
+            chartData.add(com.dunx.swpoolm.operation.dto.TeacherDashboardSummaryResponse.MonthlyChartData.builder()
+                    .month(monthDate.format(formatter))
+                    .value((int) count)
+                    .build());
+        }
+
+        java.util.List<com.dunx.swpoolm.operation.dto.TeacherDashboardSummaryResponse.WeeklyChartData> weeklyChartData = new java.util.ArrayList<>();
+        java.time.temporal.WeekFields weekFields = java.time.temporal.WeekFields.of(java.util.Locale.getDefault());
+        for (int i = 7; i >= 0; i--) {
+            LocalDate weekDate = today.minusWeeks(i);
+            LocalDate weekStart = weekDate.with(java.time.DayOfWeek.MONDAY);
+            LocalDate weekEnd = weekStart.plusDays(6);
+
+            long count = attendanceRepository.countByTeacherIdAndAttendDateBetween(teacherId, weekStart, weekEnd);
+
+            int weekNumber = weekStart.get(weekFields.weekOfWeekBasedYear());
+            weeklyChartData.add(com.dunx.swpoolm.operation.dto.TeacherDashboardSummaryResponse.WeeklyChartData.builder()
+                    .week("W" + weekNumber + "/" + weekStart.getYear())
+                    .value((int) count)
+                    .build());
+        }
+
         return com.dunx.swpoolm.operation.dto.TeacherDashboardSummaryResponse.builder()
                 .totalActiveStudents(totalActive)
                 .totalSessionsTaughtThisMonth(sessionsThisMonth)
                 .expiringSoonCount(expiringSoon)
                 .absentCount(absentStudents)
+                .attendanceChartData(chartData)
+                .weeklyAttendanceChartData(weeklyChartData)
                 .build();
     }
 }
