@@ -297,6 +297,48 @@ public class EnrollmentServiceImpl implements EnrollmentService {
      * Validate danh sách teacherIds: tồn tại + đang ACTIVE.
      * Trích xuất để tránh duplicate code giữa create và update.
      */
+    @Override
+    @Transactional(readOnly = true)
+    public com.dunx.swpoolm.operation.dto.AdminDashboardSummaryResponse getAdminDashboardSummary() {
+        long totalActiveStudents = enrollmentRepository.countByStatus(EnrollmentStatus.ACTIVE);
+        long totalActiveTeachers = teacherRepository.countByStatus(com.dunx.swpoolm.teacher.enums.TeacherStatus.ACTIVE);
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate startOfMonthDate = today.withDayOfMonth(1);
+        java.time.LocalDate endOfMonthDate = today.withDayOfMonth(today.lengthOfMonth());
+        
+        java.time.Instant startOfMonth = startOfMonthDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant();
+        java.time.Instant endOfMonth = endOfMonthDate.plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().minusMillis(1);
+
+        long newEnrollmentsThisMonth = enrollmentRepository.countByCreatedAtBetween(startOfMonth, endOfMonth);
+
+        java.util.List<com.dunx.swpoolm.operation.dto.AdminDashboardSummaryResponse.MonthlyChartData> chartData = new java.util.ArrayList<>();
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("MM/yyyy");
+
+        for (int i = 5; i >= 0; i--) {
+            java.time.LocalDate monthDate = today.minusMonths(i);
+            java.time.LocalDate start = monthDate.withDayOfMonth(1);
+            java.time.LocalDate end = monthDate.withDayOfMonth(monthDate.lengthOfMonth());
+
+            java.time.Instant startInstant = start.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant();
+            java.time.Instant endInstant = end.plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().minusMillis(1);
+
+            long count = enrollmentRepository.countByCreatedAtBetween(startInstant, endInstant);
+
+            chartData.add(com.dunx.swpoolm.operation.dto.AdminDashboardSummaryResponse.MonthlyChartData.builder()
+                    .month(monthDate.format(formatter))
+                    .value((int) count)
+                    .build());
+        }
+
+        return com.dunx.swpoolm.operation.dto.AdminDashboardSummaryResponse.builder()
+                .totalActiveStudents(totalActiveStudents)
+                .totalActiveTeachers(totalActiveTeachers)
+                .newEnrollmentsThisMonth(newEnrollmentsThisMonth)
+                .enrollmentChartData(chartData)
+                .build();
+    }
+
     private List<Teacher> resolveAndValidateTeachers(Set<UUID> teacherIds) {
         if (teacherIds == null || teacherIds.isEmpty()) {
             throw new AppException(MessageKeys.Enrollment.EMPTY_TEACHERS);

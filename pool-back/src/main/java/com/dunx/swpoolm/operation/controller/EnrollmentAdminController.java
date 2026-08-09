@@ -5,7 +5,6 @@ import com.dunx.swpoolm.common.dto.PageResponse;
 import com.dunx.swpoolm.common.i18n.MessageKeys;
 import com.dunx.swpoolm.common.i18n.MessageService;
 import com.dunx.swpoolm.iam.security.CustomUserDetails;
-import com.dunx.swpoolm.operation.cronjob.EnrollmentCronjobService;
 import com.dunx.swpoolm.operation.dto.*;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
@@ -28,7 +27,6 @@ public class EnrollmentAdminController {
 
     private final EnrollmentService enrollmentService;
     private final MessageService messageService;
-    private final EnrollmentCronjobService enrollmentCronjobService;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -85,30 +83,4 @@ public class EnrollmentAdminController {
         return ResponseEntity.ok(ApiResponse.success(null, messageService.get(MessageKeys.Common.SUCCESS)));
     }
 
-    @GetMapping("/alerts")
-    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
-    public ResponseEntity<ApiResponse<List<AlertResponse>>> getSystemAlerts(Authentication authentication) {
-
-        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-        UUID userId = userDetails.getUser().getId();
-
-        boolean isAdmin = userDetails.getAuthorities().stream()
-                .anyMatch(role -> role.getAuthority().equals("ROLE_ADMIN"));
-
-        List<AlertResponse> alerts = enrollmentService.getSystemAlerts(userId, isAdmin);
-
-        return ResponseEntity.ok(ApiResponse.success(alerts, messageService.get(MessageKeys.Common.SUCCESS)));
-    }
-
-    @PostMapping("/cronjobs/auto-expire")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<String>> triggerAutoExpireCronjob() {
-
-        enrollmentCronjobService.autoExpireEnrollmentsJob();
-
-        return ResponseEntity.ok(ApiResponse.success(
-                "Triggered",
-                "Cronjob quét khóa học hết hạn đã được chạy thủ công thành công!"
-        ));
-    }
 }

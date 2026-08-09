@@ -13,6 +13,7 @@ public interface EnrollmentService {
     EnrollmentResponse updateEnrollment(UUID enrollmentId, EnrollmentUpdateRequest request);
     void completeEnrollment(UUID enrollmentId);
     List<AlertResponse> getSystemAlerts(UUID userId, boolean isAdmin);
+    AdminDashboardSummaryResponse getAdminDashboardSummary();
 
     PageResponse<EnrollmentResponse> getEnrollments(EnrollmentStatus status, SwimStyle swimStyle,
                                                      String studentName, UUID teacherId, int page, int size);

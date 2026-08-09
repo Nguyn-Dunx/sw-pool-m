@@ -18,6 +18,10 @@ import java.util.UUID;
 @Repository
 public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
 
+    long countByStatus(EnrollmentStatus status);
+    
+    long countByCreatedAtBetween(java.time.Instant start, java.time.Instant end);
+
     long countByTeachers_IdAndStatus(UUID teacherId, EnrollmentStatus status);
 
     boolean existsByStudentIdAndSwimStyleAndStatus(UUID studentId, SwimStyle swimStyle, EnrollmentStatus status);
