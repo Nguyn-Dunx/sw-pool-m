@@ -28,4 +28,7 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
 
     @Query("SELECT MAX(a.attendDate) FROM AttendanceRecord a WHERE a.enrollment.id = :enrollmentId")
     LocalDate findLastAttendDateByEnrollmentId(@Param("enrollmentId") UUID enrollmentId);
+
+    @Query("SELECT COUNT(a) FROM AttendanceRecord a WHERE a.teacher.id = :teacherId AND a.attendDate BETWEEN :startDate AND :endDate")
+    long countByTeacherIdAndAttendDateBetween(@Param("teacherId") UUID teacherId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 }

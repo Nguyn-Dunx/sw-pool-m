@@ -288,4 +288,33 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
                 .studentDob(enrollment.getStudent().getDob())
                 .build();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.dunx.swpoolm.operation.dto.TeacherDashboardSummaryResponse getDashboardSummary(UUID userId) {
+        Teacher teacher = teacherRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
+        
+        UUID teacherId = teacher.getId();
+        LocalDate today = LocalDate.now();
+
+        long totalActive = enrollmentRepository.countByTeachers_IdAndStatus(teacherId, EnrollmentStatus.ACTIVE);
+        
+        LocalDate startOfMonth = today.withDayOfMonth(1);
+        LocalDate endOfMonth = today.withDayOfMonth(today.lengthOfMonth());
+        long sessionsThisMonth = attendanceRepository.countByTeacherIdAndAttendDateBetween(teacherId, startOfMonth, endOfMonth);
+
+        LocalDate thresholdDate = today.plusDays(5);
+        long expiringSoon = enrollmentRepository.findExpiringSoonEnrollmentsByTeacher(teacherId, today, thresholdDate).size();
+
+        LocalDate absentThreshold = today.minusDays(7);
+        long absentStudents = enrollmentRepository.findAbsentEnrollmentsByTeacher(teacherId, absentThreshold).size();
+
+        return com.dunx.swpoolm.operation.dto.TeacherDashboardSummaryResponse.builder()
+                .totalActiveStudents(totalActive)
+                .totalSessionsTaughtThisMonth(sessionsThisMonth)
+                .expiringSoonCount(expiringSoon)
+                .absentCount(absentStudents)
+                .build();
+    }
 }

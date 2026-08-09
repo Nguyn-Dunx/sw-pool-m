@@ -18,4 +18,5 @@ public interface TeacherOperationService {
     List<AttendanceHistoryResponse> getStudentHistory(UUID userId, UUID enrollmentId);
     void completeEnrollment(UUID userId, UUID enrollmentId);
     com.dunx.swpoolm.operation.dto.EnrollmentDetailResponse getEnrollmentDetail(UUID userId, UUID enrollmentId);
+    com.dunx.swpoolm.operation.dto.TeacherDashboardSummaryResponse getDashboardSummary(UUID userId);
 }

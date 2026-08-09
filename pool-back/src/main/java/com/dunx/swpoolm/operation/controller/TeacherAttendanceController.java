@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/teacher/attendances")
 @RequiredArgsConstructor
-public class TeacherOperationController {
+public class TeacherAttendanceController {
 
     private final TeacherOperationService teacherOperationService;
     private final MessageService messageService;

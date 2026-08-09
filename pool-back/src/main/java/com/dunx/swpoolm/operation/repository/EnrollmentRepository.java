@@ -18,13 +18,7 @@ import java.util.UUID;
 @Repository
 public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
 
-    @Query("SELECT e FROM Enrollment e JOIN e.teachers t WHERE t.id = :teacherId AND e.status = :status")
-    List<Enrollment> findByTeacherIdAndStatus(@Param("teacherId") UUID teacherId, @Param("status") EnrollmentStatus status);
-
-    @Query("SELECT e FROM Enrollment e WHERE e.status = 'ACTIVE' AND e.expireDate <= :warningDate")
-    List<Enrollment> findExpiringEnrollments(@Param("warningDate") LocalDate warningDate);
-
-    List<Enrollment> findByStatusAndExpireDateBefore(EnrollmentStatus status, LocalDate date);
+    long countByTeachers_IdAndStatus(UUID teacherId, EnrollmentStatus status);
 
     boolean existsByStudentIdAndSwimStyleAndStatus(UUID studentId, SwimStyle swimStyle, EnrollmentStatus status);
 
