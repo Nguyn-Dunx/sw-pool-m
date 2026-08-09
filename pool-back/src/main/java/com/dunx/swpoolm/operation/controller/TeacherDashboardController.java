@@ -25,16 +25,21 @@ public class TeacherDashboardController {
     private final TeacherOperationService teacherOperationService;
     private final MessageService messageService;
 
-    // 1. API Lấy danh sách Học viên của Giáo viên
+    // 1. API Lấy danh sách Học viên của Giáo viên (Có lọc đa chiều)
     @GetMapping("/my-students")
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ApiResponse<PageResponse<TeacherDashboardResponse>>> getMyStudents(
+            @RequestParam(required = false) String searchName,
+            @RequestParam(required = false) com.dunx.swpoolm.operation.enums.SwimStyle swimStyle,
+            @RequestParam(required = false) com.dunx.swpoolm.operation.enums.EnrollmentStatus status,
+            @RequestParam(required = false) Boolean isGuaranteed,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             Authentication authentication) {
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-        PageResponse<TeacherDashboardResponse> response = teacherOperationService.getMyStudents(userDetails.getUser().getId(), page, size);
+        PageResponse<TeacherDashboardResponse> response = teacherOperationService.getMyStudents(
+                userDetails.getUser().getId(), searchName, swimStyle, status, isGuaranteed, page, size);
 
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }
@@ -50,5 +55,31 @@ public class TeacherDashboardController {
         List<AttendanceHistoryResponse> response = teacherOperationService.getStudentHistory(userDetails.getUser().getId(), enrollmentId);
 
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
+    }
+
+    // 3. API Xem chi tiết Khóa học dành cho Teacher
+    @GetMapping("/enrollments/{enrollmentId}")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ApiResponse<com.dunx.swpoolm.operation.dto.EnrollmentDetailResponse>> getEnrollmentDetail(
+            @PathVariable UUID enrollmentId,
+            Authentication authentication) {
+
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        com.dunx.swpoolm.operation.dto.EnrollmentDetailResponse response = teacherOperationService.getEnrollmentDetail(userDetails.getUser().getId(), enrollmentId);
+
+        return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
+    }
+
+    // 4. API Đóng khóa học thủ công (Teacher)
+    @PutMapping("/enrollments/{enrollmentId}/complete")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ApiResponse<Void>> completeEnrollment(
+            @PathVariable UUID enrollmentId,
+            Authentication authentication) {
+
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        teacherOperationService.completeEnrollment(userDetails.getUser().getId(), enrollmentId);
+
+        return ResponseEntity.ok(ApiResponse.success(null, messageService.get(MessageKeys.Common.SUCCESS)));
     }
 }

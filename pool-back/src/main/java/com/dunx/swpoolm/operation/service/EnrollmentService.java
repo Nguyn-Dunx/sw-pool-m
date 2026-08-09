@@ -11,6 +11,7 @@ import java.util.UUID;
 public interface EnrollmentService {
     EnrollmentResponse createEnrollment(EnrollmentCreateRequest request);
     EnrollmentResponse updateEnrollment(UUID enrollmentId, EnrollmentUpdateRequest request);
+    void completeEnrollment(UUID enrollmentId);
     List<AlertResponse> getSystemAlerts(UUID userId, boolean isAdmin);
 
     PageResponse<EnrollmentResponse> getEnrollments(EnrollmentStatus status, SwimStyle swimStyle,

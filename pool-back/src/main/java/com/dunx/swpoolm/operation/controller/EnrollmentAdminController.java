@@ -76,6 +76,15 @@ public class EnrollmentAdminController {
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.UPDATED)));
     }
 
+    @PutMapping("/{id}/complete")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> completeEnrollment(@PathVariable UUID id) {
+        
+        enrollmentService.completeEnrollment(id);
+
+        return ResponseEntity.ok(ApiResponse.success(null, messageService.get(MessageKeys.Common.SUCCESS)));
+    }
+
     @GetMapping("/alerts")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public ResponseEntity<ApiResponse<List<AlertResponse>>> getSystemAlerts(Authentication authentication) {

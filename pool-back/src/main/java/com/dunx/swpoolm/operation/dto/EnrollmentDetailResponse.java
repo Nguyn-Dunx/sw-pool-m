@@ -23,4 +23,6 @@ public class EnrollmentDetailResponse {
     private LocalDate expireDate;
     private EnrollmentStatus status;
     private List<AttendanceHistoryResponse> attendanceHistory;
+    private String studentPhone;
+    private LocalDate studentDob;
 }

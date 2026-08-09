@@ -28,10 +28,20 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
 
     boolean existsByStudentIdAndSwimStyleAndStatus(UUID studentId, SwimStyle swimStyle, EnrollmentStatus status);
 
-    @Query("SELECT e FROM Enrollment e JOIN e.teachers t " +
-            "WHERE t.id = :teacherId AND e.status = 'ACTIVE' ORDER BY e.expireDate ASC")
-    Page<Enrollment> findActiveEnrollmentsByTeacher(@Param("teacherId") UUID teacherId, Pageable pageable);
-
+    @Query("SELECT e FROM Enrollment e JOIN e.teachers t WHERE t.id = :teacherId " +
+           "AND (:status IS NULL OR e.status = :status) " +
+           "AND (:swimStyle IS NULL OR e.swimStyle = :swimStyle) " +
+           "AND (:isGuaranteed IS NULL OR e.isGuaranteed = :isGuaranteed) " +
+           "AND (:studentName IS NULL OR LOWER(e.student.fullName) LIKE LOWER(CONCAT('%', :studentName, '%'))) " +
+           "ORDER BY e.startDate DESC")
+    Page<Enrollment> findEnrollmentsByTeacherWithFilters(
+            @Param("teacherId") UUID teacherId,
+            @Param("status") EnrollmentStatus status,
+            @Param("swimStyle") SwimStyle swimStyle,
+            @Param("isGuaranteed") Boolean isGuaranteed,
+            @Param("studentName") String studentName,
+            Pageable pageable
+    );
     // for Cronjob
     @Modifying
     @Query("UPDATE Enrollment e SET e.status = 'EXPIRED' " +

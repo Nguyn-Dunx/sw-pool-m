@@ -116,13 +116,18 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<TeacherDashboardResponse> getMyStudents(UUID userId, int page, int size) {
+    public PageResponse<TeacherDashboardResponse> getMyStudents(
+            UUID userId, String searchName, com.dunx.swpoolm.operation.enums.SwimStyle swimStyle,
+            EnrollmentStatus status, Boolean isGuaranteed,
+            int page, int size) {
+
         Teacher teacher = teacherRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
 
         Pageable pageable = PageRequest.of(page - 1, size);
 
-        Page<Enrollment> enrollmentPage = enrollmentRepository.findActiveEnrollmentsByTeacher(teacher.getId(), pageable);
+        Page<Enrollment> enrollmentPage = enrollmentRepository.findEnrollmentsByTeacherWithFilters(
+                teacher.getId(), status, swimStyle, isGuaranteed, searchName, pageable);
 
         if (enrollmentPage.isEmpty()) {
             return PageResponse.<TeacherDashboardResponse>builder()
@@ -165,6 +170,8 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
                     .progressPercentage(Math.min(percent, 100)) // Chặn quá 100% nếu là học bù
                     .expireDate(enrollment.getExpireDate())
                     .daysRemaining(daysRemaining)
+                    .studentPhone(enrollment.getStudent().getPhoneNumber())
+                    .status(enrollment.getStatus())
                     .build();
         }).toList();
 
@@ -205,5 +212,80 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
                             .note(record.getNote())
                             .build();
                 }).toList();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void completeEnrollment(UUID userId, UUID enrollmentId) {
+        Teacher teacher = teacherRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
+
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Common.NOT_FOUND));
+
+        // Kiểm tra quyền: Teacher phải được gán vào lớp này mới được thao tác
+        boolean isAssigned = enrollment.getTeachers().stream()
+                .anyMatch(t -> t.getId().equals(teacher.getId()));
+        if (!isAssigned) {
+            throw new AppException(MessageKeys.Attendance.UNAUTHORIZED);
+        }
+
+        if (enrollment.getStatus() != EnrollmentStatus.ACTIVE) {
+            throw new AppException(MessageKeys.Common.BAD_REQUEST);
+        }
+
+        enrollment.setStatus(EnrollmentStatus.COMPLETED);
+        enrollmentRepository.save(enrollment);
+        log.info("Teacher {} đã đóng (COMPLETED) khóa học của học viên {}", teacher.getFullName(), enrollment.getStudent().getFullName());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.dunx.swpoolm.operation.dto.EnrollmentDetailResponse getEnrollmentDetail(UUID userId, UUID enrollmentId) {
+        Teacher teacher = teacherRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
+
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Common.NOT_FOUND));
+
+        boolean isAssigned = enrollment.getTeachers().stream()
+                .anyMatch(t -> t.getId().equals(teacher.getId()));
+        if (!isAssigned) {
+            throw new AppException(MessageKeys.Attendance.UNAUTHORIZED);
+        }
+
+        List<String> teacherNames = enrollment.getTeachers().stream()
+                .map(Teacher::getFullName).toList();
+
+        int attendedSessions = (int) attendanceRepository.countByEnrollmentId(enrollmentId);
+
+        List<AttendanceHistoryResponse> history = attendanceRepository
+                .findByEnrollmentIdOrderByAttendDateDesc(enrollmentId)
+                .stream().map(record -> {
+                    String shiftTime = record.getShift().getStartTime() + " - " + record.getShift().getEndTime();
+                    return AttendanceHistoryResponse.builder()
+                            .attendanceId(record.getId())
+                            .attendDate(record.getAttendDate())
+                            .shiftTime(shiftTime)
+                            .checkedInBy(record.getTeacher().getFullName())
+                            .note(record.getNote())
+                            .build();
+                }).toList();
+
+        return com.dunx.swpoolm.operation.dto.EnrollmentDetailResponse.builder()
+                .id(enrollment.getId())
+                .studentName(enrollment.getStudent().getFullName())
+                .teacherNames(teacherNames)
+                .swimStyle(enrollment.getSwimStyle())
+                .isGuaranteed(enrollment.getIsGuaranteed())
+                .totalQuota(enrollment.getTotalQuota())
+                .attendedSessions(attendedSessions)
+                .startDate(enrollment.getStartDate())
+                .expireDate(enrollment.getExpireDate())
+                .status(enrollment.getStatus())
+                .attendanceHistory(history)
+                .studentPhone(enrollment.getStudent().getPhoneNumber())
+                .studentDob(enrollment.getStudent().getDob())
+                .build();
     }
 }

@@ -149,17 +149,29 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             enrollment.setTotalQuota(request.getTotalQuota());
         }
 
-        Enrollment saved = enrollmentRepository.save(enrollment);
-        List<String> teacherNames = saved.getTeachers().stream()
-                .map(Teacher::getFullName).toList();
+        Enrollment savedEnrollment = enrollmentRepository.save(enrollment);
+        log.info("Khóa học của {} đã được cập nhật", savedEnrollment.getStudent().getFullName());
 
-        log.info("Admin đã cập nhật Enrollment {} cho học viên {}",
-                enrollmentId, enrollment.getStudent().getFullName());
-
-        return mapToResponse(saved, enrollment.getStudent().getFullName(), teacherNames);
+        return mapToResponse(savedEnrollment, savedEnrollment.getStudent().getFullName(),
+                savedEnrollment.getTeachers().stream().map(Teacher::getFullName).toList());
     }
 
-    // ===================== ALERTS =====================
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void completeEnrollment(UUID enrollmentId) {
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Common.NOT_FOUND));
+
+        if (enrollment.getStatus() != EnrollmentStatus.ACTIVE) {
+            throw new AppException(MessageKeys.Common.BAD_REQUEST); // Tạm dùng BAD_REQUEST, sau này có thể thêm ALREADY_COMPLETED
+        }
+
+        enrollment.setStatus(EnrollmentStatus.COMPLETED);
+        enrollmentRepository.save(enrollment);
+        log.info("Khóa học của {} đã được đóng (COMPLETED) thủ công", enrollment.getStudent().getFullName());
+    }
+
+    // ========== 2. API CẢNH BÁO QUẢN LÝ (ALERTS) =====================
 
     @Override
     @Transactional(readOnly = true)
@@ -274,6 +286,8 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 .expireDate(enrollment.getExpireDate())
                 .status(enrollment.getStatus())
                 .attendanceHistory(history)
+                .studentPhone(enrollment.getStudent().getPhoneNumber())
+                .studentDob(enrollment.getStudent().getDob())
                 .build();
     }
 

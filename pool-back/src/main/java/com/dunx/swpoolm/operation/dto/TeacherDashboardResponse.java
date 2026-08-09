@@ -23,4 +23,8 @@ public class TeacherDashboardResponse {
     // Cảnh báo hết hạn
     private LocalDate expireDate;
     private Long daysRemaining; // Nếu < 5 thì Frontend sẽ tô đỏ
+    
+    // Bổ sung thêm
+    private String studentPhone;
+    private com.dunx.swpoolm.operation.enums.EnrollmentStatus status;
 }
