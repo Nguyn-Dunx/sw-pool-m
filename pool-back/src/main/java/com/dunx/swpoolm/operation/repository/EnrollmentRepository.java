@@ -41,6 +41,9 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             Pageable pageable
     );
     // for Cronjob
+    // Chỉ expire enrollment KHÔNG cam kết (isGuaranteed = false).
+    // Enrollment có cam kết (isGuaranteed = true) được học bù không giới hạn thời gian,
+    // nên không tự động hết hạn — Admin phải đóng thủ công khi thấy phù hợp.
     @Modifying
     @Query("UPDATE Enrollment e SET e.status = 'EXPIRED' " +
             "WHERE e.status = 'ACTIVE' AND e.isGuaranteed = false AND e.expireDate < :today")

@@ -2,6 +2,7 @@ package com.dunx.swpoolm.operation.dto;
 
 import com.dunx.swpoolm.operation.enums.RequestType;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -17,6 +18,7 @@ public class EnrollmentRequestCreateDTO {
     private UUID targetEnrollmentId;
 
     // Optional (cho cả CREATE và UPDATE, Teacher đề xuất)
+    @Min(value = 1, message = "{validation.min}")
     private Integer totalQuota;
     private LocalDate startDate;
     private LocalDate expireDate;

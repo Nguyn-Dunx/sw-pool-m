@@ -1,5 +1,6 @@
 package com.dunx.swpoolm.operation.service;
 
+import com.dunx.swpoolm.common.dto.PageRequestValidator;
 import com.dunx.swpoolm.common.dto.PageResponse;
 import com.dunx.swpoolm.common.exception.AppException;
 import com.dunx.swpoolm.common.exception.ResourceNotFoundException;
@@ -8,7 +9,6 @@ import com.dunx.swpoolm.common.i18n.MessageService;
 import com.dunx.swpoolm.common.setting.service.SettingService;
 import com.dunx.swpoolm.operation.dto.*;
 import com.dunx.swpoolm.operation.entity.Enrollment;
-import com.dunx.swpoolm.operation.enums.AlertType;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import com.dunx.swpoolm.operation.repository.AttendanceRecordRepository;
@@ -24,7 +24,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 import org.springframework.data.domain.Page;
@@ -171,60 +170,13 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         log.info("Khóa học của {} đã được đóng (COMPLETED) thủ công", enrollment.getStudent().getFullName());
     }
 
-    // ========== 2. API CẢNH BÁO QUẢN LÝ (ALERTS) =====================
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<AlertResponse> getSystemAlerts(UUID userId, boolean isAdmin) {
-        LocalDate today = LocalDate.now();
-        int expireDays = settingService.getInt("alert.expire-threshold-days");
-        int absentDays = settingService.getInt("alert.absent-threshold-days");
-
-        LocalDate expireThreshold = today.plusDays(expireDays);
-        LocalDate absentThreshold = today.minusDays(absentDays);
-
-        List<Enrollment> expiringSoon;
-        List<Enrollment> absentStudents;
-
-        if (isAdmin) {
-            expiringSoon = enrollmentRepository.findExpiringSoonEnrollments(today, expireThreshold);
-            absentStudents = enrollmentRepository.findAbsentEnrollments(absentThreshold);
-        } else {
-            Teacher teacher = teacherRepository.findByUserId(userId)
-                    .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
-
-            expiringSoon = enrollmentRepository.findExpiringSoonEnrollmentsByTeacher(teacher.getId(), today, expireThreshold);
-            absentStudents = enrollmentRepository.findAbsentEnrollmentsByTeacher(teacher.getId(), absentThreshold);
-        }
-
-        List<AlertResponse> alerts = new ArrayList<>();
-
-        // 1. Sắp hết hạn
-        for (Enrollment e : expiringSoon) {
-            long daysLeft = ChronoUnit.DAYS.between(today, e.getExpireDate());
-            String msg = messageService.get(MessageKeys.Alert.EXPIRING_SOON, daysLeft, e.getExpireDate());
-            alerts.add(buildAlert(e, AlertType.EXPIRING_SOON, msg));
-        }
-
-        // 2. Vắng mặt lâu ngày
-        for (Enrollment e : absentStudents) {
-            LocalDate lastAttendDate = attendanceRecordRepository.findLastAttendDateByEnrollmentId(e.getId());
-            LocalDate fromDate = (lastAttendDate != null) ? lastAttendDate : e.getStartDate();
-            long actualAbsentDays = ChronoUnit.DAYS.between(fromDate, today);
-            String msg = messageService.get(MessageKeys.Alert.ABSENT, actualAbsentDays);
-            alerts.add(buildAlert(e, AlertType.ABSENT, msg));
-        }
-
-        return alerts;
-    }
-
     // ===================== LIST & DETAIL =====================
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<EnrollmentResponse> getEnrollments(EnrollmentStatus status, SwimStyle swimStyle,
                                                             String studentName, UUID teacherId, int page, int size) {
-        Pageable pageable = PageRequest.of(page - 1, size);
+        Pageable pageable = PageRequestValidator.validate(page, size);
         Page<Enrollment> enrollmentPage;
 
         if (teacherId != null) {
@@ -297,48 +249,6 @@ public class EnrollmentServiceImpl implements EnrollmentService {
      * Validate danh sách teacherIds: tồn tại + đang ACTIVE.
      * Trích xuất để tránh duplicate code giữa create và update.
      */
-    @Override
-    @Transactional(readOnly = true)
-    public com.dunx.swpoolm.operation.dto.AdminDashboardSummaryResponse getAdminDashboardSummary() {
-        long totalActiveStudents = enrollmentRepository.countByStatus(EnrollmentStatus.ACTIVE);
-        long totalActiveTeachers = teacherRepository.countByStatus(com.dunx.swpoolm.teacher.enums.TeacherStatus.ACTIVE);
-
-        java.time.LocalDate today = java.time.LocalDate.now();
-        java.time.LocalDate startOfMonthDate = today.withDayOfMonth(1);
-        java.time.LocalDate endOfMonthDate = today.withDayOfMonth(today.lengthOfMonth());
-        
-        java.time.Instant startOfMonth = startOfMonthDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant();
-        java.time.Instant endOfMonth = endOfMonthDate.plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().minusMillis(1);
-
-        long newEnrollmentsThisMonth = enrollmentRepository.countByCreatedAtBetween(startOfMonth, endOfMonth);
-
-        java.util.List<com.dunx.swpoolm.operation.dto.AdminDashboardSummaryResponse.MonthlyChartData> chartData = new java.util.ArrayList<>();
-        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("MM/yyyy");
-
-        for (int i = 5; i >= 0; i--) {
-            java.time.LocalDate monthDate = today.minusMonths(i);
-            java.time.LocalDate start = monthDate.withDayOfMonth(1);
-            java.time.LocalDate end = monthDate.withDayOfMonth(monthDate.lengthOfMonth());
-
-            java.time.Instant startInstant = start.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant();
-            java.time.Instant endInstant = end.plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().minusMillis(1);
-
-            long count = enrollmentRepository.countByCreatedAtBetween(startInstant, endInstant);
-
-            chartData.add(com.dunx.swpoolm.operation.dto.AdminDashboardSummaryResponse.MonthlyChartData.builder()
-                    .month(monthDate.format(formatter))
-                    .value((int) count)
-                    .build());
-        }
-
-        return com.dunx.swpoolm.operation.dto.AdminDashboardSummaryResponse.builder()
-                .totalActiveStudents(totalActiveStudents)
-                .totalActiveTeachers(totalActiveTeachers)
-                .newEnrollmentsThisMonth(newEnrollmentsThisMonth)
-                .enrollmentChartData(chartData)
-                .build();
-    }
-
     private List<Teacher> resolveAndValidateTeachers(Set<UUID> teacherIds) {
         if (teacherIds == null || teacherIds.isEmpty()) {
             throw new AppException(MessageKeys.Enrollment.EMPTY_TEACHERS);
@@ -357,18 +267,6 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         }
 
         return teachers;
-    }
-
-    /**
-     * Build AlertResponse từ Enrollment — tránh duplicate code trong vòng for.
-     */
-    private AlertResponse buildAlert(Enrollment e, AlertType type, String message) {
-        return AlertResponse.builder()
-                .enrollmentId(e.getId())
-                .studentName(e.getStudent().getFullName())
-                .alertType(String.valueOf(type))
-                .message(message)
-                .build();
     }
 
     private EnrollmentResponse mapToResponse(Enrollment enrollment, String studentName, List<String> teacherNames) {

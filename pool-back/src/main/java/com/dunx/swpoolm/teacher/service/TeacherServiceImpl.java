@@ -1,5 +1,6 @@
 package com.dunx.swpoolm.teacher.service;
 
+import com.dunx.swpoolm.common.dto.PageRequestValidator;
 import com.dunx.swpoolm.common.dto.PageResponse;
 import com.dunx.swpoolm.common.exception.AppException;
 import com.dunx.swpoolm.common.exception.ResourceNotFoundException;
@@ -81,7 +82,7 @@ public class TeacherServiceImpl implements TeacherService {
 
     @Override
     public PageResponse<TeacherResponse> getTeachers(String keyword, int page, int size) {
-        Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
+        Pageable pageable = PageRequestValidator.validate(page, size, Sort.by("createdAt").descending());
 
         Page<Teacher> teacherPage = teacherRepository.searchTeachers(keyword, pageable);
 

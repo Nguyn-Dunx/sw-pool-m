@@ -1,6 +1,7 @@
 package com.dunx.swpoolm.operation.dto;
 
 import com.dunx.swpoolm.operation.enums.RequestStatus;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -18,6 +19,7 @@ public class EnrollmentRequestReviewDTO {
     private String adminNote;
 
     // Optional override (Admin có thể sửa lại so với đề xuất của Teacher)
+    @Min(value = 1, message = "{validation.min}")
     private Integer totalQuota;
     private LocalDate startDate;
     private LocalDate expireDate;

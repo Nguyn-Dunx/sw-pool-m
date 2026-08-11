@@ -1,5 +1,6 @@
 package com.dunx.swpoolm.operation.service;
 
+import com.dunx.swpoolm.common.dto.PageRequestValidator;
 import com.dunx.swpoolm.common.dto.PageResponse;
 import com.dunx.swpoolm.common.exception.AppException;
 import com.dunx.swpoolm.common.exception.ResourceNotFoundException;
@@ -121,7 +122,7 @@ public class EnrollmentRequestServiceImpl implements EnrollmentRequestService {
         Teacher teacher = teacherRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
 
-        Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
+        Pageable pageable = PageRequestValidator.validate(page, size, Sort.by("createdAt").descending());
         Page<EnrollmentRequest> requestPage = enrollmentRequestRepository.findByTeacherIdAndType(teacher.getId(), requestType, pageable);
 
         return buildPageResponse(requestPage, page, size);
@@ -129,7 +130,7 @@ public class EnrollmentRequestServiceImpl implements EnrollmentRequestService {
 
     @Override
     public PageResponse<EnrollmentRequestResponse> getRequestsByStatus(RequestStatus status, RequestType requestType, int page, int size) {
-        Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
+        Pageable pageable = PageRequestValidator.validate(page, size, Sort.by("createdAt").descending());
         Page<EnrollmentRequest> requestPage = enrollmentRequestRepository.findByStatusAndType(status, requestType, pageable);
 
         return buildPageResponse(requestPage, page, size);

@@ -17,6 +17,8 @@ public class MessageKeys {
         public static final String VALIDATION = "error.validation";
         public static final String ACCESS_DENIED = "error.access_denied";
         public static final String BAD_REQUEST = "error.bad_request";
+        public static final String PAGE_INVALID = "validation.page_invalid";
+        public static final String SIZE_INVALID = "validation.size_invalid";
     }
 
     @UtilityClass
@@ -35,6 +37,9 @@ public class MessageKeys {
 
         public static final String SESSION_EXPIRED =
                 "error.auth.session_expired";
+
+        public static final String RATE_LIMIT_EXCEEDED =
+                "error.auth.rate_limit_exceeded";
 
         public static final String LOGIN_SUCCESS =
                 "info.auth.login_success";

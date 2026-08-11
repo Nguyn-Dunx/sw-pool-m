@@ -1,9 +1,11 @@
 package com.dunx.swpoolm.operation.service;
 
+import com.dunx.swpoolm.common.dto.PageRequestValidator;
 import com.dunx.swpoolm.common.dto.PageResponse;
 import com.dunx.swpoolm.common.exception.AppException;
 import com.dunx.swpoolm.common.exception.ResourceNotFoundException;
 import com.dunx.swpoolm.common.i18n.MessageKeys;
+import com.dunx.swpoolm.common.setting.service.SettingService;
 import com.dunx.swpoolm.operation.dto.AttendanceCreateRequest;
 import com.dunx.swpoolm.operation.dto.AttendanceHistoryResponse;
 import com.dunx.swpoolm.operation.dto.AttendanceResponse;
@@ -42,6 +44,7 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
     private final EnrollmentRepository enrollmentRepository;
     private final ShiftRepository shiftRepository;
     private final TeacherRepository teacherRepository;
+    private final SettingService settingService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -124,7 +127,7 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
         Teacher teacher = teacherRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
 
-        Pageable pageable = PageRequest.of(page - 1, size);
+        Pageable pageable = PageRequestValidator.validate(page, size);
 
         Page<Enrollment> enrollmentPage = enrollmentRepository.findEnrollmentsByTeacherWithFilters(
                 teacher.getId(), status, swimStyle, isGuaranteed, searchName, pageable);
@@ -304,10 +307,14 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
         LocalDate endOfMonth = today.withDayOfMonth(today.lengthOfMonth());
         long sessionsThisMonth = attendanceRepository.countByTeacherIdAndAttendDateBetween(teacherId, startOfMonth, endOfMonth);
 
-        LocalDate thresholdDate = today.plusDays(5);
+        // Đọc ngưỡng cảnh báo từ System Settings (đồng bộ với AlertController)
+        int expireThresholdDays = settingService.getInt("alert.expire-threshold-days");
+        int absentThresholdDays = settingService.getInt("alert.absent-threshold-days");
+
+        LocalDate thresholdDate = today.plusDays(expireThresholdDays);
         long expiringSoon = enrollmentRepository.findExpiringSoonEnrollmentsByTeacher(teacherId, today, thresholdDate).size();
 
-        LocalDate absentThreshold = today.minusDays(7);
+        LocalDate absentThreshold = today.minusDays(absentThresholdDays);
         long absentStudents = enrollmentRepository.findAbsentEnrollmentsByTeacher(teacherId, absentThreshold).size();
 
         java.util.List<com.dunx.swpoolm.operation.dto.TeacherDashboardSummaryResponse.MonthlyChartData> chartData = new java.util.ArrayList<>();

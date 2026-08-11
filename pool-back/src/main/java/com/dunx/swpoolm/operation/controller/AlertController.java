@@ -6,7 +6,7 @@ import com.dunx.swpoolm.common.i18n.MessageService;
 import com.dunx.swpoolm.iam.security.CustomUserDetails;
 import com.dunx.swpoolm.operation.cronjob.EnrollmentCronjobService;
 import com.dunx.swpoolm.operation.dto.AlertResponse;
-import com.dunx.swpoolm.operation.service.EnrollmentService;
+import com.dunx.swpoolm.operation.service.AlertService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,7 +24,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AlertController {
 
-    private final EnrollmentService enrollmentService;
+    private final AlertService alertService;
     private final MessageService messageService;
     private final EnrollmentCronjobService enrollmentCronjobService;
 
@@ -38,7 +38,7 @@ public class AlertController {
         boolean isAdmin = userDetails.getAuthorities().stream()
                 .anyMatch(role -> role.getAuthority().equals("ROLE_ADMIN"));
 
-        List<AlertResponse> alerts = enrollmentService.getSystemAlerts(userId, isAdmin);
+        List<AlertResponse> alerts = alertService.getAlerts(userId, isAdmin);
 
         return ResponseEntity.ok(ApiResponse.success(alerts, messageService.get(MessageKeys.Common.SUCCESS)));
     }

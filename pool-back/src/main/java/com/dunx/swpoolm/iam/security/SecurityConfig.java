@@ -3,6 +3,7 @@ package com.dunx.swpoolm.iam.security;
 import com.dunx.swpoolm.common.constant.SecurityConstants;
 import com.dunx.swpoolm.iam.security.filter.JsonAuthenticationFilter;
 import com.dunx.swpoolm.iam.security.handler.*;
+import com.dunx.swpoolm.iam.security.ratelimit.LoginRateLimitFilter;
 import com.dunx.swpoolm.iam.service.CustomRememberMeServices;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +59,7 @@ public class SecurityConfig {
     private final CustomAuthenticationSuccessHandler successHandler;
     private final CustomAuthenticationFailureHandler failureHandler;
     private final CustomLogoutSuccessHandler logoutSuccessHandler;
+    private final LoginRateLimitFilter loginRateLimitFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, AuthenticationManager authenticationManager, RememberMeServices rememberMeServices) throws Exception {
@@ -83,7 +85,15 @@ public class SecurityConfig {
         http.headers(headers -> headers
                 .frameOptions(frame -> frame.deny())
                 .xssProtection(xss -> xss.disable())
-                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
+                // CSP mở rộng cho SPA: cho phép inline script (React), CDN font/style, ảnh data-uri
+                .contentSecurityPolicy(csp -> csp.policyDirectives(
+                        "default-src 'self'; " +
+                        "script-src 'self' 'unsafe-inline'; " +
+                        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+                        "font-src 'self' https://fonts.gstatic.com data:; " +
+                        "img-src 'self' data: blob:; " +
+                        "connect-src 'self' http://localhost:8080 ws://localhost:5173; "
+                ))
         );
 
         // 4. Exception Handling (Trả JSON thay vì HTML)
@@ -135,6 +145,9 @@ public class SecurityConfig {
 
         // Gắn chiến lược quản lý Session vào Filter (chống Session Fixation + giới hạn phiên)
         jsonAuthFilter.setSessionAuthenticationStrategy(sessionAuthenticationStrategy());
+
+        // Rate limiting cho login — chạy TRƯỚC JsonAuthenticationFilter
+        http.addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class);
 
         // Đặt Filter của chúng ta lên trước Filter mặc định
         http.addFilterAt(jsonAuthFilter, UsernamePasswordAuthenticationFilter.class);

@@ -1,5 +1,6 @@
 package com.dunx.swpoolm.student.service;
 
+import com.dunx.swpoolm.common.dto.PageRequestValidator;
 import com.dunx.swpoolm.common.dto.PageResponse;
 import com.dunx.swpoolm.common.exception.ResourceNotFoundException;
 import com.dunx.swpoolm.common.i18n.MessageKeys;
@@ -63,7 +64,7 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public PageResponse<StudentResponse> getStudents(String keyword, int page, int size) {
-        Pageable pageable = PageRequest.of(page - 1, size, Sort.by("createdAt").descending());
+        Pageable pageable = PageRequestValidator.validate(page, size, Sort.by("createdAt").descending());
         Page<Student> studentPage = studentRepository.searchStudents(keyword, pageable);
 
         List<StudentResponse> responses = studentPage.getContent().stream()
