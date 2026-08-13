@@ -16,7 +16,7 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
     Iterable<Student> findByPhoneNumberContaining(String phoneNumber);
 
     @Query("SELECT s FROM Student s WHERE " +
-            "(:keyword IS NULL OR LOWER(s.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-            "OR s.phoneNumber LIKE CONCAT('%', :keyword, '%'))")
+            "LOWER(s.fullName) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%')) " +
+            "OR s.phoneNumber LIKE CONCAT('%', COALESCE(:keyword, ''), '%')")
     Page<Student> searchStudents(@Param("keyword") String keyword, Pageable pageable);
 }

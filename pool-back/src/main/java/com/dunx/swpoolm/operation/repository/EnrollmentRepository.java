@@ -30,7 +30,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
            "AND (:status IS NULL OR e.status = :status) " +
            "AND (:swimStyle IS NULL OR e.swimStyle = :swimStyle) " +
            "AND (:isGuaranteed IS NULL OR e.isGuaranteed = :isGuaranteed) " +
-           "AND (:studentName IS NULL OR LOWER(e.student.fullName) LIKE LOWER(CONCAT('%', :studentName, '%'))) " +
+//           "AND (:studentName IS NULL OR LOWER(e.student.fullName) LIKE LOWER(CONCAT('%', :studentName, '%'))) " +
+           "AND LOWER(e.student.fullName) LIKE LOWER(CONCAT('%', COALESCE(:studentName, ''), '%')) " +
            "ORDER BY e.startDate DESC")
     Page<Enrollment> findEnrollmentsByTeacherWithFilters(
             @Param("teacherId") UUID teacherId,
@@ -43,7 +44,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     // for Cronjob
     // Chỉ expire enrollment KHÔNG cam kết (isGuaranteed = false).
     // Enrollment có cam kết (isGuaranteed = true) được học bù không giới hạn thời gian,
-    // nên không tự động hết hạn — Admin phải đóng thủ công khi thấy phù hợp.
+    // nên không tự động hết hạn — Admin/Teacher phải đóng thủ công khi thấy phù hợp.
     @Modifying
     @Query("UPDATE Enrollment e SET e.status = 'EXPIRED' " +
             "WHERE e.status = 'ACTIVE' AND e.isGuaranteed = false AND e.expireDate < :today")
@@ -109,7 +110,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     @Query("SELECT e FROM Enrollment e JOIN FETCH e.student " +
             "WHERE (:status IS NULL OR e.status = :status) " +
             "AND (:swimStyle IS NULL OR e.swimStyle = :swimStyle) " +
-            "AND (:studentName IS NULL OR LOWER(e.student.fullName) LIKE LOWER(CONCAT('%', :studentName, '%'))) " +
+            "AND LOWER(e.student.fullName) " +
+                "LIKE LOWER(CONCAT('%', COALESCE(:studentName, ''), '%')) " +
             "ORDER BY e.createdAt DESC")
     Page<Enrollment> findAllWithFilters(
             @Param("status") EnrollmentStatus status,

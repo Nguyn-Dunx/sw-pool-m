@@ -1,6 +1,7 @@
 package com.dunx.swpoolm.student.controller;
 
 import com.dunx.swpoolm.common.dto.ApiResponse;
+import com.dunx.swpoolm.common.dto.PageResponse;
 import com.dunx.swpoolm.common.i18n.MessageKeys;
 import com.dunx.swpoolm.common.i18n.MessageService;
 import com.dunx.swpoolm.student.dto.StudentResponse;
@@ -31,5 +32,20 @@ public class StudentTeacherController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response, messageService.get(MessageKeys.Common.CREATED)));
+    }
+
+    /**
+     * Teacher lấy danh sách học viên (để chọn khi tạo enrollment request).
+     * Trả về page, teacher có thể search theo tên/SĐT.
+     */
+    @GetMapping
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ApiResponse<PageResponse<StudentResponse>>> getStudents(
+            @RequestParam(required = false, defaultValue = "") String keyword,
+            @RequestParam(required = false, defaultValue = "1") int page,
+            @RequestParam(required = false, defaultValue = "100") int size) {
+
+        PageResponse<StudentResponse> response = studentService.getStudents(keyword, page, size);
+        return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }
 }
