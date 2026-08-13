@@ -10,6 +10,26 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: poolm_test
+          POSTGRES_USER: poolm
+          POSTGRES_PASSWORD: poolm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U poolm -d poolm_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/poolm_test
+      DB_USERNAME: poolm
+      DB_PASSWORD: poolm
+
     # Vì project backend nằm trong thư mục con "pool-back"
     defaults:
       run:
