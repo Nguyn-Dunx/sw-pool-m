@@ -25,6 +25,18 @@ dist/
 coverage/
 
 # =========================
+# Vite / Frontend Caches & Logs
+# =========================
+dist-ssr/
+*.local
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# =========================
 # IntelliJ IDEA
 # =========================
 .idea/
