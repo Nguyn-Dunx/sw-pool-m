@@ -125,46 +125,109 @@ function StudentForm({ student, onClose, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault()
+
+    const trimmedName = form.fullName.trim()
+    if (!trimmedName) {
+      toast.error('Vui lòng nhập họ tên học viên')
+      return
+    }
+    if (trimmedName.length > 100) {
+      toast.error('Họ tên không được vượt quá 100 ký tự')
+      return
+    }
+
+    const trimmedPhone = form.phoneNumber.trim()
+    if (!trimmedPhone) {
+      toast.error('Vui lòng nhập số điện thoại')
+      return
+    }
+    const phoneRegex = /^(0|\+84)[3|5|7|8|9][0-9]{8}$/
+    if (!phoneRegex.test(trimmedPhone)) {
+      toast.error('Số điện thoại không hợp lệ (10 chữ số, ví dụ 0912345678 hoặc +84912345678)')
+      return
+    }
+
+    if (!form.dob) {
+      toast.error('Vui lòng chọn ngày sinh')
+      return
+    }
+    if (new Date(form.dob) >= new Date()) {
+      toast.error('Ngày sinh phải là ngày trong quá khứ')
+      return
+    }
+
     setLoading(true)
     try {
       if (isEdit) {
         const { password, ...body } = form
+        body.fullName = trimmedName
+        body.phoneNumber = trimmedPhone
         await updateStudent(student.id, body)
         toast.success('Cập nhật học viên thành công')
       } else {
-        await createStudent(form)
+        const body = {
+          fullName: trimmedName,
+          phoneNumber: trimmedPhone,
+          dob: form.dob,
+          sourceType: form.sourceType
+        }
+        await createStudent(body)
         toast.success('Thêm học viên thành công')
       }
       onSaved()
-    } catch (e) { toast.error(errMsg(e)) } finally { setLoading(false) }
+    } catch (e) {
+      toast.error(errMsg(e))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <Modal open onClose={onClose} title={isEdit ? 'Sửa học viên' : 'Thêm học viên'}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Họ tên" required>
-          <input value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} className={inputCls} required />
+          <input
+            value={form.fullName}
+            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+            className={inputCls}
+            placeholder="Nguyễn Văn A"
+            maxLength={100}
+            required
+          />
         </Field>
         <Field label="Số điện thoại" required hint="Định dạng: 0xxxxxxxxx (10 số)">
-          <input type="tel" value={form.phoneNumber} onChange={e => setForm({ ...form, phoneNumber: e.target.value })} className={inputCls} placeholder="0912345678" required />
+          <input
+            type="tel"
+            value={form.phoneNumber}
+            onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
+            className={inputCls}
+            placeholder="0912345678"
+            required
+          />
         </Field>
-        {!isEdit && (
-          <Field label="Mật khẩu" required hint="Tối thiểu 6 ký tự">
-            <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className={inputCls} required />
-          </Field>
-        )}
         <Field label="Ngày sinh" required>
-          <input type="date" value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} className={inputCls} required />
+          <input
+            type="date"
+            value={form.dob}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setForm({ ...form, dob: e.target.value })}
+            className={inputCls}
+            required
+          />
         </Field>
         <Field label="Nguồn học viên" required hint="Học viên tự đến bể hoặc do giáo viên giới thiệu">
-          <select value={form.sourceType} onChange={e => setForm({ ...form, sourceType: e.target.value })} className={inputCls} required>
+          <select value={form.sourceType} onChange={(e) => setForm({ ...form, sourceType: e.target.value })} className={inputCls} required>
             <option value="POOL">Tự đến bể (POOL)</option>
             <option value="TEACHER">Giáo viên giới thiệu (TEACHER)</option>
           </select>
         </Field>
         <div className="flex gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={onClose} className="flex-1">Hủy</Button>
-          <Button type="submit" disabled={loading} className="flex-1">{loading ? 'Đang lưu...' : 'Lưu'}</Button>
+          <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            Hủy
+          </Button>
+          <Button type="submit" disabled={loading} className="flex-1">
+            {loading ? 'Đang lưu...' : 'Lưu'}
+          </Button>
         </div>
       </form>
     </Modal>

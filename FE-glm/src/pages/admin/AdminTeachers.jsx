@@ -122,48 +122,139 @@ function TeacherForm({ teacher, onClose, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault()
+
+    const trimmedName = form.fullName.trim()
+    if (!trimmedName) {
+      toast.error('Vui lòng nhập họ tên giáo viên')
+      return
+    }
+    if (trimmedName.length > 100) {
+      toast.error('Họ tên không được vượt quá 100 ký tự')
+      return
+    }
+
+    if (!isEdit) {
+      const trimmedPhone = form.phoneNumber.trim()
+      if (!trimmedPhone) {
+        toast.error('Vui lòng nhập số điện thoại')
+        return
+      }
+      const phoneRegex = /^(0|\+84)[3|5|7|8|9][0-9]{8}$/
+      if (!phoneRegex.test(trimmedPhone)) {
+        toast.error('Số điện thoại không hợp lệ (10 chữ số, ví dụ 0912345678 hoặc +84912345678)')
+        return
+      }
+
+      if (!form.password) {
+        toast.error('Vui lòng nhập mật khẩu')
+        return
+      }
+      if (form.password.length < 6) {
+        toast.error('Mật khẩu phải có tối thiểu 6 ký tự')
+        return
+      }
+      if (form.password.length > 50) {
+        toast.error('Mật khẩu không được vượt quá 50 ký tự')
+        return
+      }
+    }
+
+    const trimmedSpecialty = form.specialty ? form.specialty.trim() : ''
+    if (trimmedSpecialty.length > 100) {
+      toast.error('Chuyên môn không được vượt quá 100 ký tự')
+      return
+    }
+
     setLoading(true)
     try {
       if (isEdit) {
-        const { password, ...body } = form
+        const body = {
+          fullName: trimmedName,
+          specialty: trimmedSpecialty || undefined,
+          status: form.status
+        }
         await updateTeacher(teacher.id, body)
         toast.success('Cập nhật giáo viên thành công')
       } else {
-        await createTeacher(form)
+        const body = {
+          fullName: trimmedName,
+          phoneNumber: form.phoneNumber.trim(),
+          password: form.password,
+          specialty: trimmedSpecialty || undefined
+        }
+        await createTeacher(body)
         toast.success('Thêm giáo viên thành công')
       }
       onSaved()
-    } catch (e) { toast.error(errMsg(e)) } finally { setLoading(false) }
+    } catch (e) {
+      toast.error(errMsg(e))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <Modal open onClose={onClose} title={isEdit ? 'Sửa giáo viên' : 'Thêm giáo viên'}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Họ tên" required>
-          <input value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} className={inputCls} required />
+          <input
+            value={form.fullName}
+            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+            className={inputCls}
+            placeholder="Nguyễn Văn A"
+            maxLength={100}
+            required
+          />
         </Field>
         <Field label="Số điện thoại" required hint={isEdit ? 'Số điện thoại không thể thay đổi' : 'Định dạng: 0xxxxxxxxx (10 số)'}>
-          <input type="tel" value={form.phoneNumber} onChange={e => setForm({ ...form, phoneNumber: e.target.value })} className={`${inputCls} ${isEdit ? 'bg-ink-50 text-ink-500 cursor-not-allowed' : ''}`} placeholder="0912345678" required disabled={isEdit} />
+          <input
+            type="tel"
+            value={form.phoneNumber}
+            onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
+            className={`${inputCls} ${isEdit ? 'bg-ink-50 text-ink-500 cursor-not-allowed' : ''}`}
+            placeholder="0912345678"
+            required
+            disabled={isEdit}
+          />
         </Field>
         {!isEdit && (
-          <Field label="Mật khẩu" required hint="Tối thiểu 6 ký tự">
-            <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className={inputCls} required />
+          <Field label="Mật khẩu" required hint="Tối thiểu 6 ký tự, tối đa 50 ký tự">
+            <input
+              type="password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              className={inputCls}
+              placeholder="••••••••"
+              minLength={6}
+              maxLength={50}
+              required
+            />
           </Field>
         )}
-        <Field label="Chuyên môn" hint="VD: Bơi ếch, bơi tự do, bơi ngửa...">
-          <input value={form.specialty} onChange={e => setForm({ ...form, specialty: e.target.value })} className={inputCls} placeholder="Bơi ếch, bơi tự do" />
+        <Field label="Chuyên môn" hint="VD: Bơi ếch, bơi sải, bơi ngửa...">
+          <input
+            value={form.specialty}
+            onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+            className={inputCls}
+            placeholder="Bơi ếch, bơi sải"
+            maxLength={100}
+          />
         </Field>
         {isEdit && (
           <Field label="Trạng thái" required>
-            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className={inputCls}>
+            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className={inputCls}>
               <option value="ACTIVE">Hoạt động</option>
               <option value="INACTIVE">Ngừng hoạt động</option>
             </select>
           </Field>
         )}
         <div className="flex gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={onClose} className="flex-1">Hủy</Button>
-          <Button type="submit" disabled={loading} className="flex-1">{loading ? 'Đang lưu...' : 'Lưu'}</Button>
+          <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            Hủy
+          </Button>
+          <Button type="submit" disabled={loading} className="flex-1">
+            {loading ? 'Đang lưu...' : 'Lưu'}
+          </Button>
         </div>
       </form>
     </Modal>

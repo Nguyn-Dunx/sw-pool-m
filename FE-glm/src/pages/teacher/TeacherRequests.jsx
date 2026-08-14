@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ListChecks, Plus, Search, UserPlus, Users, Shield, Info } from 'lucide-react'
-import { getMyEnrollmentRequests, createEnrollmentRequest, createTeacherStudent, getMyStudents } from '../../lib/apiTeacher'
+import { getMyEnrollmentRequests, createEnrollmentRequest, getTeacherStudents, createTeacherStudent, getMyStudents } from '../../lib/apiTeacher'
 import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
@@ -98,6 +98,7 @@ function CreateRequestModal({ onClose, onCreated }) {
   const [requestType, setRequestType] = useState('CREATE')
   const [form, setForm] = useState({
     studentId: '',
+    selectedStudentName: '',
     targetEnrollmentId: '',
     swimStyle: 'FROG',
     isGuaranteed: false,
@@ -107,6 +108,7 @@ function CreateRequestModal({ onClose, onCreated }) {
     note: ''
   })
   const [loading, setLoading] = useState(false)
+  const [resolvingStudentId, setResolvingStudentId] = useState(false)
 
   // Student selection mode for CREATE
   const [studentMode, setStudentMode] = useState('existing') // 'existing' | 'new'
@@ -129,7 +131,7 @@ function CreateRequestModal({ onClose, onCreated }) {
   const uniqueStudents = (() => {
     const map = new Map()
     myEnrollments.forEach(en => {
-      if (!map.has(en.studentName)) {
+      if (en.studentName && !map.has(en.studentName)) {
         map.set(en.studentName, { studentName: en.studentName, studentPhone: en.studentPhone })
       }
     })
@@ -158,6 +160,25 @@ function CreateRequestModal({ onClose, onCreated }) {
     }
   }, [debouncedUpdateSearch, requestType])
 
+  // When selecting an existing student in CREATE mode: resolve their UUID via getTeacherStudents
+  const handleSelectExistingStudent = async (student) => {
+    setForm(f => ({ ...f, selectedStudentName: student.studentName, studentId: '' }))
+    setResolvingStudentId(true)
+    try {
+      const res = await getTeacherStudents({ keyword: student.studentPhone || student.studentName, page: 1, size: 10 })
+      const matched = res.content?.find(st => st.phoneNumber === student.studentPhone || st.fullName === student.studentName) || res.content?.[0]
+      if (matched) {
+        setForm(f => ({ ...f, selectedStudentName: student.studentName, studentId: matched.id }))
+      } else {
+        toast.error('Không tìm thấy mã học viên trong hệ thống')
+      }
+    } catch (err) {
+      toast.error('Không lấy được thông tin học viên: ' + errMsg(err))
+    } finally {
+      setResolvingStudentId(false)
+    }
+  }
+
   // When selecting an enrollment in UPDATE mode, pre-fill form with current data
   const handleSelectEnrollment = (en) => {
     setSelectedEnrollment(en)
@@ -172,40 +193,71 @@ function CreateRequestModal({ onClose, onCreated }) {
     }))
   }
 
-  // When selecting a student in CREATE mode, find their studentId from enrollments
-  const handleSelectStudent = (student) => {
-    // Find the first enrollment for this student to extract their studentId info
-    // Note: The enrollment API returns enrollmentId not studentId, so we set by name
-    // The backend EnrollmentRequestCreateDTO uses studentId (UUID)
-    // But teacher enrollments don't expose studentId. We'll need to use a workaround.
-    // Actually, looking at the enrollment data we have studentName and studentPhone,
-    // but not studentId. So the teacher needs to create using name-based lookup.
-    // The backend expects studentId, so we need to get it from the enrollment detail.
-    setForm(f => ({ ...f, selectedStudentName: student.studentName }))
-  }
-
   const submit = async (e) => {
     e.preventDefault()
 
     // Validate
     if (requestType === 'CREATE') {
-      if (studentMode === 'existing' && !form.studentId) {
-        toast.error('Vui lòng chọn học viên')
-        return
+      if (studentMode === 'existing') {
+        if (!form.selectedStudentName) {
+          toast.error('Vui lòng chọn học viên')
+          return
+        }
+        if (!form.studentId) {
+          toast.error('Đang tải ID học viên hoặc chưa tìm thấy ID, vui lòng thử chọn lại')
+          return
+        }
       }
       if (studentMode === 'new') {
-        if (!newStudent.fullName.trim()) { toast.error('Vui lòng nhập họ tên học viên'); return }
-        if (!newStudent.phoneNumber.trim()) { toast.error('Vui lòng nhập số điện thoại'); return }
-        if (!/^(0|\+84)[3|5|7|8|9][0-9]{8}$/.test(newStudent.phoneNumber)) { toast.error('Số điện thoại không đúng định dạng'); return }
-        if (!newStudent.dob) { toast.error('Vui lòng nhập ngày sinh'); return }
-        if (new Date(newStudent.dob) >= new Date()) { toast.error('Ngày sinh phải là ngày trong quá khứ'); return }
+        const trimmedFullName = newStudent.fullName.trim()
+        if (!trimmedFullName) {
+          toast.error('Vui lòng nhập họ tên học viên')
+          return
+        }
+        if (trimmedFullName.length > 100) {
+          toast.error('Họ tên không được vượt quá 100 ký tự')
+          return
+        }
+        const trimmedPhone = newStudent.phoneNumber.trim()
+        if (!trimmedPhone) {
+          toast.error('Vui lòng nhập số điện thoại')
+          return
+        }
+        const phoneRegex = /^(0|\+84)[3|5|7|8|9][0-9]{8}$/
+        if (!phoneRegex.test(trimmedPhone)) {
+          toast.error('Số điện thoại không hợp lệ (10 chữ số, ví dụ 0912345678 hoặc +84912345678)')
+          return
+        }
+        if (!newStudent.dob) {
+          toast.error('Vui lòng nhập ngày sinh')
+          return
+        }
+        if (new Date(newStudent.dob) >= new Date()) {
+          toast.error('Ngày sinh phải là ngày trong quá khứ')
+          return
+        }
       }
     }
+
     if (requestType === 'UPDATE' && !form.targetEnrollmentId) {
       toast.error('Vui lòng chọn khóa học cần cập nhật')
       return
     }
-    if (!form.swimStyle) { toast.error('Vui lòng chọn kiểu bơi'); return }
+
+    if (!form.swimStyle) {
+      toast.error('Vui lòng chọn kiểu bơi')
+      return
+    }
+
+    if (form.totalQuota && Number(form.totalQuota) < 1) {
+      toast.error('Tổng số buổi học phải lớn hơn 0')
+      return
+    }
+
+    if (form.startDate && form.expireDate && new Date(form.startDate) >= new Date(form.expireDate)) {
+      toast.error('Ngày hết hạn phải sau ngày bắt đầu')
+      return
+    }
 
     setLoading(true)
     try {
@@ -213,7 +265,11 @@ function CreateRequestModal({ onClose, onCreated }) {
 
       // If CREATE + new student mode → create student first
       if (requestType === 'CREATE' && studentMode === 'new') {
-        const created = await createTeacherStudent(newStudent)
+        const created = await createTeacherStudent({
+          fullName: newStudent.fullName.trim(),
+          phoneNumber: newStudent.phoneNumber.trim(),
+          dob: newStudent.dob
+        })
         studentId = created.id
       }
 
@@ -226,13 +282,17 @@ function CreateRequestModal({ onClose, onCreated }) {
         totalQuota: form.totalQuota ? Number(form.totalQuota) : undefined,
         startDate: form.startDate || undefined,
         expireDate: form.expireDate || undefined,
-        note: form.note || undefined
+        note: form.note?.trim() || undefined
       }
 
       await createEnrollmentRequest(body)
-      toast.success('Đã gửi yêu cầu đăng ký')
+      toast.success('Đã gửi yêu cầu đăng ký cho Admin duyệt')
       onCreated()
-    } catch (e) { toast.error(errMsg(e)) } finally { setLoading(false) }
+    } catch (e) {
+      toast.error(errMsg(e))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -241,10 +301,24 @@ function CreateRequestModal({ onClose, onCreated }) {
         {/* Request type selector */}
         <Field label="Loại yêu cầu" required>
           <div className="flex gap-2">
-            <button type="button" onClick={() => { setRequestType('CREATE'); setSelectedEnrollment(null) }} className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${requestType === 'CREATE' ? 'bg-pool-50 border-pool-300 text-pool-700 shadow-sm' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
+            <button
+              type="button"
+              onClick={() => {
+                setRequestType('CREATE')
+                setSelectedEnrollment(null)
+              }}
+              className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${requestType === 'CREATE' ? 'bg-pool-50 border-pool-300 text-pool-700 shadow-sm' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}
+            >
               <Plus className="w-4 h-4 inline mr-1.5" /> Tạo khóa học mới
             </button>
-            <button type="button" onClick={() => { setRequestType('UPDATE'); setForm(f => ({ ...f, studentId: '' })) }} className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${requestType === 'UPDATE' ? 'bg-pool-50 border-pool-300 text-pool-700 shadow-sm' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
+            <button
+              type="button"
+              onClick={() => {
+                setRequestType('UPDATE')
+                setForm(f => ({ ...f, studentId: '', selectedStudentName: '' }))
+              }}
+              className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${requestType === 'UPDATE' ? 'bg-pool-50 border-pool-300 text-pool-700 shadow-sm' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}
+            >
               <ListChecks className="w-4 h-4 inline mr-1.5" /> Cập nhật khóa học
             </button>
           </div>
@@ -255,10 +329,18 @@ function CreateRequestModal({ onClose, onCreated }) {
           <>
             <Field label="Học viên" required>
               <div className="flex gap-2 mb-3">
-                <button type="button" onClick={() => setStudentMode('existing')} className={`flex-1 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${studentMode === 'existing' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
+                <button
+                  type="button"
+                  onClick={() => setStudentMode('existing')}
+                  className={`flex-1 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${studentMode === 'existing' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}
+                >
                   <Users className="w-4 h-4 inline mr-1.5" /> Chọn học viên đã có
                 </button>
-                <button type="button" onClick={() => setStudentMode('new')} className={`flex-1 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${studentMode === 'new' ? 'bg-violet-50 border-violet-300 text-violet-700' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
+                <button
+                  type="button"
+                  onClick={() => setStudentMode('new')}
+                  className={`flex-1 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${studentMode === 'new' ? 'bg-violet-50 border-violet-300 text-violet-700' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}
+                >
                   <UserPlus className="w-4 h-4 inline mr-1.5" /> Tạo học viên mới
                 </button>
               </div>
@@ -274,26 +356,39 @@ function CreateRequestModal({ onClose, onCreated }) {
                       className={inputCls + ' pl-10'}
                     />
                   </div>
-                  <p className="text-xs text-ink-400 flex items-center gap-1"><Info className="w-3 h-3" /> Chỉ hiển thị học viên mà bạn đang phụ trách</p>
-                  <div className="border border-ink-200 rounded-xl max-h-40 overflow-y-auto">
+                  <p className="text-xs text-ink-400 flex items-center gap-1">
+                    <Info className="w-3 h-3" /> Chỉ hiển thị học viên mà bạn đang phụ trách
+                  </p>
+                  <div className="border border-ink-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-ink-100/60">
                     {studentsLoading ? (
                       <Spinner className="py-4" size={20} />
                     ) : uniqueStudents.length === 0 ? (
                       <p className="text-sm text-ink-400 py-4 text-center">Không tìm thấy học viên</p>
                     ) : (
                       uniqueStudents.map(s => (
-                        <label key={s.studentName} className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-pool-50/50 transition-colors ${form.selectedStudentName === s.studentName ? 'bg-pool-50' : ''}`}>
-                          <input type="radio" name="student" checked={form.selectedStudentName === s.studentName} onChange={() => {
-                            // Find first enrollment for this student to get reference
-                            const en = myEnrollments.find(e => e.studentName === s.studentName)
-                            // We don't have studentId from enrollment API,
-                            // but the backend needs it. Use enrollment's student info.
-                            setForm(f => ({ ...f, selectedStudentName: s.studentName }))
-                          }} className="w-4 h-4 text-pool-600" />
-                          <div>
-                            <p className="text-sm font-medium text-ink-800">{s.studentName}</p>
-                            <p className="text-xs text-ink-400">{s.studentPhone || ''}</p>
+                        <label
+                          key={s.studentName}
+                          className={`flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-pool-50/50 transition-colors ${form.selectedStudentName === s.studentName ? 'bg-pool-50' : ''}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="student"
+                              checked={form.selectedStudentName === s.studentName}
+                              onChange={() => handleSelectExistingStudent(s)}
+                              className="w-4 h-4 text-pool-600"
+                            />
+                            <div>
+                              <p className="text-sm font-medium text-ink-800">{s.studentName}</p>
+                              <p className="text-xs text-ink-400">{s.studentPhone || ''}</p>
+                            </div>
                           </div>
+                          {form.selectedStudentName === s.studentName && resolvingStudentId && (
+                            <span className="text-xs text-pool-600 font-medium animate-pulse">Đang nạp ID...</span>
+                          )}
+                          {form.selectedStudentName === s.studentName && form.studentId && (
+                            <Badge color="green">Đã chọn</Badge>
+                          )}
                         </label>
                       ))
                     )}
@@ -302,13 +397,31 @@ function CreateRequestModal({ onClose, onCreated }) {
               ) : (
                 <div className="space-y-3 p-3 bg-violet-50/50 rounded-xl border border-violet-200/60">
                   <Field label="Họ tên" required>
-                    <input value={newStudent.fullName} onChange={e => setNewStudent({ ...newStudent, fullName: e.target.value })} className={inputCls} placeholder="Nguyễn Văn A" />
+                    <input
+                      value={newStudent.fullName}
+                      onChange={e => setNewStudent({ ...newStudent, fullName: e.target.value })}
+                      className={inputCls}
+                      placeholder="Nguyễn Văn A"
+                      maxLength={100}
+                    />
                   </Field>
                   <Field label="Số điện thoại" required hint="Định dạng: 0xxxxxxxxx (10 số)">
-                    <input type="tel" value={newStudent.phoneNumber} onChange={e => setNewStudent({ ...newStudent, phoneNumber: e.target.value })} className={inputCls} placeholder="0912345678" />
+                    <input
+                      type="tel"
+                      value={newStudent.phoneNumber}
+                      onChange={e => setNewStudent({ ...newStudent, phoneNumber: e.target.value })}
+                      className={inputCls}
+                      placeholder="0912345678"
+                    />
                   </Field>
                   <Field label="Ngày sinh" required>
-                    <input type="date" value={newStudent.dob} max={new Date().toISOString().slice(0, 10)} onChange={e => setNewStudent({ ...newStudent, dob: e.target.value })} className={inputCls} />
+                    <input
+                      type="date"
+                      value={newStudent.dob}
+                      max={new Date().toISOString().slice(0, 10)}
+                      onChange={e => setNewStudent({ ...newStudent, dob: e.target.value })}
+                      className={inputCls}
+                    />
                   </Field>
                 </div>
               )}
@@ -325,7 +438,10 @@ function CreateRequestModal({ onClose, onCreated }) {
                 <input
                   placeholder="Tìm theo tên học viên..."
                   value={updateStudentSearch}
-                  onChange={(e) => { setUpdateStudentSearch(e.target.value); setSelectedEnrollment(null) }}
+                  onChange={(e) => {
+                    setUpdateStudentSearch(e.target.value)
+                    setSelectedEnrollment(null)
+                  }}
                   className={inputCls + ' pl-10'}
                 />
               </div>
@@ -336,9 +452,19 @@ function CreateRequestModal({ onClose, onCreated }) {
                   <p className="text-sm text-ink-400 py-4 text-center">Không tìm thấy khóa học</p>
                 ) : (
                   updateEnrollments.map(en => (
-                    <label key={en.enrollmentId} className={`flex items-center justify-between px-3 py-3 cursor-pointer hover:bg-pool-50/50 transition-colors border-b border-ink-100/40 last:border-0 ${form.targetEnrollmentId === en.enrollmentId ? 'bg-pool-50' : ''}`}>
+                    <label
+                      key={en.enrollmentId}
+                      className={`flex items-center justify-between px-3 py-3 cursor-pointer hover:bg-pool-50/50 transition-colors border-b border-ink-100/40 last:border-0 ${form.targetEnrollmentId === en.enrollmentId ? 'bg-pool-50' : ''}`}
+                    >
                       <div className="flex items-center gap-3">
-                        <input type="radio" name="enrollment" value={en.enrollmentId} checked={form.targetEnrollmentId === en.enrollmentId} onChange={() => handleSelectEnrollment(en)} className="w-4 h-4 text-pool-600" />
+                        <input
+                          type="radio"
+                          name="enrollment"
+                          value={en.enrollmentId}
+                          checked={form.targetEnrollmentId === en.enrollmentId}
+                          onChange={() => handleSelectEnrollment(en)}
+                          className="w-4 h-4 text-pool-600"
+                        />
                         <div>
                           <div className="flex items-center gap-1.5">
                             <p className="text-sm font-medium text-ink-800">{en.studentName}</p>
@@ -383,7 +509,9 @@ function CreateRequestModal({ onClose, onCreated }) {
                   </div>
                   <div>
                     <p className="text-xs text-ink-400">Còn lại</p>
-                    <p className={`font-medium ${selectedEnrollment.daysRemaining != null && selectedEnrollment.daysRemaining < 5 ? 'text-rose-600' : 'text-ink-800'}`}>{selectedEnrollment.daysRemaining != null ? `${selectedEnrollment.daysRemaining} ngày` : '—'}</p>
+                    <p className={`font-medium ${selectedEnrollment.daysRemaining != null && selectedEnrollment.daysRemaining < 5 ? 'text-rose-600' : 'text-ink-800'}`}>
+                      {selectedEnrollment.daysRemaining != null ? `${selectedEnrollment.daysRemaining} ngày` : '—'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -421,7 +549,9 @@ function CreateRequestModal({ onClose, onCreated }) {
 
         <div className="flex gap-3 pt-2">
           <Button type="button" variant="outline" onClick={onClose} className="flex-1">Hủy</Button>
-          <Button type="submit" disabled={loading} className="flex-1">{loading ? 'Đang gửi...' : 'Gửi yêu cầu'}</Button>
+          <Button type="submit" disabled={loading || resolvingStudentId} className="flex-1">
+            {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
+          </Button>
         </div>
       </form>
     </Modal>
