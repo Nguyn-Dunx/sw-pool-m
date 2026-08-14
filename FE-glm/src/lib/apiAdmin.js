@@ -37,3 +37,7 @@ export const deleteTeacher = async (id) => unwrap(await api.delete(`/admin/teach
 // ===== Alerts =====
 export const getAlerts = async () => unwrap(await api.get('/alerts'))
 export const triggerAutoExpire = async () => unwrap(await api.post('/alerts/cronjobs/auto-expire'))
+
+// ===== Settings =====
+export const getSettings = async () => unwrap(await api.get('/admin/settings'))
+export const updateSetting = async (key, body) => unwrap(await api.put(`/admin/settings/${key}`, body))

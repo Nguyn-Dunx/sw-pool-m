@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Users, GraduationCap, FileText, Bell, UserCircle, Waves, ListChecks, LogOut, X } from 'lucide-react'
+import { LayoutDashboard, Users, GraduationCap, FileText, Bell, UserCircle, Waves, ListChecks, LogOut, X, Settings } from 'lucide-react'
 import { useAuth } from '../../store/auth'
 import { toast } from '../ui/Toast'
 
@@ -9,7 +9,8 @@ const adminNav = [
   { to: '/admin/enrollment-requests', icon: FileText, label: 'Yêu cầu đăng ký' },
   { to: '/admin/students', icon: Users, label: 'Học viên' },
   { to: '/admin/teachers', icon: UserCircle, label: 'Giáo viên' },
-  { to: '/admin/alerts', icon: Bell, label: 'Cảnh báo' }
+  { to: '/admin/alerts', icon: Bell, label: 'Cảnh báo' },
+  { to: '/admin/settings', icon: Settings, label: 'Cấu hình' }
 ]
 
 const teacherNav = [

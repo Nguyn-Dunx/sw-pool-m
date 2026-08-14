@@ -14,6 +14,7 @@ import AdminEnrollmentRequests from './pages/admin/AdminEnrollmentRequests'
 import AdminStudents from './pages/admin/AdminStudents'
 import AdminTeachers from './pages/admin/AdminTeachers'
 import AdminAlerts from './pages/admin/AdminAlerts'
+import AdminSettings from './pages/admin/AdminSettings'
 
 // Teacher pages
 import TeacherDashboard from './pages/teacher/TeacherDashboard'
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="students" element={<AdminStudents />} />
           <Route path="teachers" element={<AdminTeachers />} />
           <Route path="alerts" element={<AdminAlerts />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         {/* Teacher */}

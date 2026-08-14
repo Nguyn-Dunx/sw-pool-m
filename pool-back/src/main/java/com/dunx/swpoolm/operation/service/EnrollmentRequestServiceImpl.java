@@ -207,6 +207,7 @@ public class EnrollmentRequestServiceImpl implements EnrollmentRequestService {
                 .id(request.getId())
                 .studentName(request.getStudent().getFullName())
                 .teacherName(request.getTeacher().getFullName())
+                .teacherId(request.getTeacher().getId())
                 .swimStyle(request.getSwimStyle())
                 .isGuaranteed(request.getIsGuaranteed())
                 .note(request.getNote())

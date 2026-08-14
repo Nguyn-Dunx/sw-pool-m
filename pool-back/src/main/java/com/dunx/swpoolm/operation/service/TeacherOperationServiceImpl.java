@@ -260,6 +260,9 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
         List<String> teacherNames = enrollment.getTeachers().stream()
                 .map(Teacher::getFullName).toList();
 
+        List<UUID> teacherIds = enrollment.getTeachers().stream()
+                .map(Teacher::getId).toList();
+
         int attendedSessions = (int) attendanceRepository.countByEnrollmentId(enrollmentId);
 
         List<AttendanceHistoryResponse> history = attendanceRepository
@@ -279,6 +282,7 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
                 .id(enrollment.getId())
                 .studentName(enrollment.getStudent().getFullName())
                 .teacherNames(teacherNames)
+                .teacherIds(teacherIds)
                 .swimStyle(enrollment.getSwimStyle())
                 .isGuaranteed(enrollment.getIsGuaranteed())
                 .totalQuota(enrollment.getTotalQuota())

@@ -23,7 +23,7 @@ public class SettingAdminController {
     private final MessageService messageService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public ResponseEntity<ApiResponse<List<SettingResponse>>> getAllSettings() {
         List<SettingResponse> settings = settingService.getAllSettings();
         return ResponseEntity.ok(ApiResponse.success(settings, messageService.get(MessageKeys.Common.SUCCESS)));

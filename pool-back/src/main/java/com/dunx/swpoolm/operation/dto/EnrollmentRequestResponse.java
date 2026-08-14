@@ -16,6 +16,7 @@ public class EnrollmentRequestResponse {
     private UUID id;
     private String studentName;
     private String teacherName;
+    private UUID teacherId;
     private SwimStyle swimStyle;
     private Boolean isGuaranteed;
     private String note;

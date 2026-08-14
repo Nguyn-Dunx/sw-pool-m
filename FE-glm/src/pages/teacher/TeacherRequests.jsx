@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ListChecks, Plus, Search, UserPlus, Users, Shield, Info } from 'lucide-react'
+import { ListChecks, Plus, Search, UserPlus, Users, Shield, Info, Eye } from 'lucide-react'
 import { getMyEnrollmentRequests, createEnrollmentRequest, getTeacherStudents, createTeacherStudent, getMyStudents } from '../../lib/apiTeacher'
 import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
+import { getTodayDate, addDays, formatDisplayDate, formatISODate } from '../../lib/dateUtils'
+import { useSystemSettings } from '../../lib/settings'
 
 const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
 const STATUS_COLOR = { PENDING: 'amber', APPROVED: 'green', REJECTED: 'red' }
@@ -18,6 +20,7 @@ export default function TeacherRequests() {
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
   const [showCreate, setShowCreate] = useState(false)
+  const [detail, setDetail] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -64,6 +67,7 @@ export default function TeacherRequests() {
                     <th className="px-4 py-3 font-semibold">Trạng thái</th>
                     <th className="px-4 py-3 font-semibold hidden md:table-cell">Ghi chú Admin</th>
                     <th className="px-4 py-3 font-semibold hidden sm:table-cell">Ngày tạo</th>
+                    <th className="px-4 py-3 font-semibold text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100/60">
@@ -75,6 +79,11 @@ export default function TeacherRequests() {
                       <td className="px-4 py-3"><Badge color={STATUS_COLOR[r.status]}>{STATUS_LABEL[r.status]}</Badge></td>
                       <td className="px-4 py-3 text-ink-500 hidden md:table-cell max-w-[200px] truncate">{r.adminNote || '—'}</td>
                       <td className="px-4 py-3 text-ink-500 hidden sm:table-cell">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '—'}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button onClick={() => setDetail(r)} className="p-1.5 rounded-lg text-pool-600 hover:bg-pool-50 transition-colors" title="Xem chi tiết">
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -89,12 +98,14 @@ export default function TeacherRequests() {
       </div>
 
       {showCreate && <CreateRequestModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />}
+      {detail && <DetailModal request={detail} onClose={() => setDetail(null)} />}
     </div>
   )
 }
 
 // ===== CREATE REQUEST MODAL =====
 function CreateRequestModal({ onClose, onCreated }) {
+  const { durationDays, defaultQuota } = useSystemSettings()
   const [requestType, setRequestType] = useState('CREATE')
   const [form, setForm] = useState({
     studentId: '',
@@ -102,9 +113,9 @@ function CreateRequestModal({ onClose, onCreated }) {
     targetEnrollmentId: '',
     swimStyle: 'FROG',
     isGuaranteed: false,
-    totalQuota: '',
-    startDate: '',
-    expireDate: '',
+    totalQuota: String(defaultQuota || 12),
+    startDate: getTodayDate(),
+    expireDate: addDays(getTodayDate(), durationDays),
     note: ''
   })
   const [loading, setLoading] = useState(false)
@@ -179,17 +190,30 @@ function CreateRequestModal({ onClose, onCreated }) {
     }
   }
 
+  // Sync default values when dynamic settings load
+  useEffect(() => {
+    if (requestType === 'CREATE') {
+      setForm(f => ({
+        ...f,
+        totalQuota: f.totalQuota === '12' || !f.totalQuota ? String(defaultQuota) : f.totalQuota,
+        expireDate: f.startDate ? addDays(f.startDate, durationDays) : f.expireDate
+      }))
+    }
+  }, [durationDays, defaultQuota, requestType])
+
   // When selecting an enrollment in UPDATE mode, pre-fill form with current data
   const handleSelectEnrollment = (en) => {
     setSelectedEnrollment(en)
+    const sDate = en.startDate || getTodayDate()
+    const eDate = en.expireDate || addDays(sDate, durationDays)
     setForm(f => ({
       ...f,
       targetEnrollmentId: en.enrollmentId,
       swimStyle: en.swimStyle || 'FROG',
       isGuaranteed: !!en.isGuaranteed,
-      totalQuota: en.totalQuota ? String(en.totalQuota) : '',
-      startDate: en.startDate || '',
-      expireDate: en.expireDate || ''
+      totalQuota: en.totalQuota ? String(en.totalQuota) : String(defaultQuota),
+      startDate: sDate,
+      expireDate: eDate
     }))
   }
 
@@ -532,13 +556,26 @@ function CreateRequestModal({ onClose, onCreated }) {
               <option value="1">Có cam kết</option>
             </select>
           </Field>
-          <Field label="Tổng buổi" hint="Để trống = mặc định">
-            <input type="number" min="1" value={form.totalQuota} onChange={e => setForm({ ...form, totalQuota: e.target.value })} className={inputCls} placeholder="12" />
+          <Field label="Tổng buổi" hint={`Số buổi học (mặc định: ${defaultQuota})`}>
+            <input type="number" min="1" value={form.totalQuota} onChange={e => setForm({ ...form, totalQuota: e.target.value })} className={inputCls} placeholder={String(defaultQuota)} />
           </Field>
-          <Field label="Ngày bắt đầu">
-            <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className={inputCls} />
+          <Field label="Ngày bắt đầu" hint={requestType === 'UPDATE' ? 'Không thể đổi ngày bắt đầu khi cập nhật' : 'Mặc định là hôm nay'}>
+            <input
+              type="date"
+              value={form.startDate}
+              onChange={e => {
+                const val = e.target.value
+                setForm(f => ({
+                  ...f,
+                  startDate: val,
+                  expireDate: val ? addDays(val, durationDays) : f.expireDate
+                }))
+              }}
+              disabled={requestType === 'UPDATE'}
+              className={inputCls + (requestType === 'UPDATE' ? ' bg-ink-50/50 text-ink-400' : '')}
+            />
           </Field>
-          <Field label="Ngày hết hạn">
+          <Field label="Ngày hết hạn" hint={`Mặc định = Ngày bắt đầu + ${durationDays} ngày`}>
             <input type="date" value={form.expireDate} min={form.startDate || undefined} onChange={e => setForm({ ...form, expireDate: e.target.value })} className={inputCls} />
           </Field>
         </div>
@@ -557,3 +594,68 @@ function CreateRequestModal({ onClose, onCreated }) {
     </Modal>
   )
 }
+
+function DetailModal({ request, onClose }) {
+  const { durationDays, defaultQuota } = useSystemSettings()
+  const displayStart = request.startDate || (request.createdAt ? formatISODate(request.createdAt) : getTodayDate())
+  const displayExpire = request.expireDate || addDays(displayStart, durationDays)
+  const displayQuota = request.totalQuota || defaultQuota
+
+  return (
+    <Modal open onClose={onClose} title="Chi tiết yêu cầu" size="lg">
+      <div className="space-y-4">
+        <div className="bg-ink-50/60 rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-ink-900 text-lg">{request.studentName || '—'}</h3>
+            <div className="flex items-center gap-2">
+              <Badge color={request.requestType === 'CREATE' ? 'blue' : 'purple'}>{TYPE_LABEL[request.requestType]}</Badge>
+              <Badge color={STATUS_COLOR[request.status]}>{STATUS_LABEL[request.status]}</Badge>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+            <div>
+              <p className="text-xs text-ink-400">Kiểu bơi</p>
+              <p className="font-medium text-ink-800">{STYLE[request.swimStyle] || request.swimStyle || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-400">Cam kết</p>
+              <p className="font-medium text-ink-800">{request.isGuaranteed ? 'Có cam kết' : 'Không'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-400">Tổng buổi</p>
+              <p className="font-medium text-ink-800">{displayQuota} buổi {request.totalQuota ? '' : '(mặc định)'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-400">Ngày bắt đầu</p>
+              <p className="font-medium text-ink-800">{formatDisplayDate(displayStart)} {request.startDate ? '' : '(mặc định)'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-400">Ngày hết hạn</p>
+              <p className="font-medium text-ink-800">{formatDisplayDate(displayExpire)} {request.expireDate ? '' : '(mặc định)'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-400">Ngày tạo</p>
+              <p className="font-medium text-ink-800">{request.createdAt ? new Date(request.createdAt).toLocaleDateString('vi-VN') : '—'}</p>
+            </div>
+          </div>
+          {request.note && (
+            <div className="pt-1">
+              <p className="text-xs text-ink-400">Ghi chú của bạn</p>
+              <p className="text-sm text-ink-700 bg-white/80 rounded-lg px-3 py-2 mt-1">{request.note}</p>
+            </div>
+          )}
+          {request.adminNote && (
+            <div className="pt-1">
+              <p className="text-xs text-ink-400">Phản hồi từ Admin</p>
+              <p className="text-sm text-ink-700 bg-white/80 rounded-lg px-3 py-2 mt-1">{request.adminNote}</p>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end pt-2">
+          <Button variant="outline" onClick={onClose}>Đóng</Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+

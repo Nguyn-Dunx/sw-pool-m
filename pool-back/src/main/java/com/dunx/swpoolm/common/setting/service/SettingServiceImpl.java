@@ -52,6 +52,7 @@ public class SettingServiceImpl implements SettingService {
     @Override
     public List<SettingResponse> getAllSettings() {
         return settingRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparing(SystemSetting::getSettingKey))
                 .map(this::mapToResponse)
                 .toList();
     }

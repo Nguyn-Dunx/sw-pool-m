@@ -5,6 +5,8 @@ import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls 
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
+import { getTodayDate, addDays, formatDisplayDate } from '../../lib/dateUtils'
+import { useSystemSettings } from '../../lib/settings'
 
 const STATUS = { ACTIVE: 'green', COMPLETED: 'blue', EXPIRED: 'gray' }
 const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
@@ -219,6 +221,7 @@ function DetailModal({ id, onClose, onEdit, onReload }) {
 }
 
 function CreateModal({ onClose, onCreated }) {
+  const { durationDays, defaultQuota } = useSystemSettings()
   const [studentSearch, setStudentSearch] = useState('')
   const [students, setStudents] = useState([])
   const [studentsLoading, setStudentsLoading] = useState(false)
@@ -234,10 +237,19 @@ function CreateModal({ onClose, onCreated }) {
     teacherIds: [],
     swimStyle: 'FROG',
     isGuaranteed: false,
-    totalQuota: '',
-    startDate: '',
-    expireDate: ''
+    totalQuota: String(defaultQuota || 12),
+    startDate: getTodayDate(),
+    expireDate: addDays(getTodayDate(), durationDays)
   })
+
+  // Sync settings when loaded
+  useEffect(() => {
+    setForm(f => ({
+      ...f,
+      totalQuota: f.totalQuota === '12' || !f.totalQuota ? String(defaultQuota) : f.totalQuota,
+      expireDate: f.startDate ? addDays(f.startDate, durationDays) : f.expireDate
+    }))
+  }, [durationDays, defaultQuota])
   const [selectedTeachers, setSelectedTeachers] = useState([])
   const [selectedStudent, setSelectedStudent] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -428,13 +440,25 @@ function CreateModal({ onClose, onCreated }) {
               <option value="1">Có cam kết</option>
             </select>
           </Field>
-          <Field label="Tổng buổi" hint="Để trống = dùng mặc định (12)">
-            <input type="number" min="1" value={form.totalQuota} onChange={e => setForm({ ...form, totalQuota: e.target.value })} className={inputCls} placeholder="12" />
+          <Field label="Tổng buổi" hint={`Số buổi học (mặc định: ${defaultQuota})`}>
+            <input type="number" min="1" value={form.totalQuota} onChange={e => setForm({ ...form, totalQuota: e.target.value })} className={inputCls} placeholder={String(defaultQuota)} />
           </Field>
-          <Field label="Ngày bắt đầu">
-            <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className={inputCls} />
+          <Field label="Ngày bắt đầu" hint="Mặc định là hôm nay">
+            <input
+              type="date"
+              value={form.startDate}
+              onChange={e => {
+                const val = e.target.value
+                setForm(f => ({
+                  ...f,
+                  startDate: val,
+                  expireDate: val ? addDays(val, durationDays) : f.expireDate
+                }))
+              }}
+              className={inputCls}
+            />
           </Field>
-          <Field label="Ngày hết hạn">
+          <Field label="Ngày hết hạn" hint={`Mặc định = Ngày bắt đầu + ${durationDays} ngày`}>
             <input type="date" value={form.expireDate} min={form.startDate || undefined} onChange={e => setForm({ ...form, expireDate: e.target.value })} className={inputCls} />
           </Field>
         </div>
@@ -449,6 +473,7 @@ function CreateModal({ onClose, onCreated }) {
 }
 
 function EditModal({ id, onClose, onSaved }) {
+  const { durationDays, defaultQuota } = useSystemSettings()
   const [detail, setDetail] = useState(null)
   const [loadingDetail, setLoadingDetail] = useState(true)
 
@@ -473,17 +498,29 @@ function EditModal({ id, onClose, onSaved }) {
     getEnrollmentDetail(id)
       .then((d) => {
         setDetail(d)
+        
+        let initialTeachers = (d.teacherIds || []).map((tid, index) => ({
+          id: tid,
+          fullName: d.teacherNames?.[index] || ''
+        }))
+
+        if (initialTeachers.length === 0 && d.teacherNames?.length > 0 && allTeachers.length > 0) {
+          initialTeachers = allTeachers.filter(at => d.teacherNames.includes(at.fullName))
+        }
+
+        setSelectedTeachers(initialTeachers)
+
         setForm({
-          teacherIds: [], // TeacherIds to override if changed
+          teacherIds: initialTeachers.map(t => t.id),
           swimStyle: d.swimStyle || 'FROG',
           isGuaranteed: !!d.isGuaranteed,
-          totalQuota: d.totalQuota ? String(d.totalQuota) : '',
-          expireDate: d.expireDate || ''
+          totalQuota: d.totalQuota ? String(d.totalQuota) : String(defaultQuota),
+          expireDate: d.expireDate || addDays(d.startDate || getTodayDate(), durationDays)
         })
       })
       .catch((e) => toast.error(errMsg(e)))
       .finally(() => setLoadingDetail(false))
-  }, [id])
+  }, [id, durationDays, defaultQuota])
 
   // Search teachers
   useEffect(() => {
@@ -491,6 +528,27 @@ function EditModal({ id, onClose, onSaved }) {
       .then(r => setAllTeachers(r.content || []))
       .catch(() => setAllTeachers([]))
   }, [debouncedTeacherSearch])
+
+  // Sync teachers if allTeachers loaded after detail
+  useEffect(() => {
+    if (!detail || allTeachers.length === 0) return
+    setSelectedTeachers(prev => {
+      if (prev.length > 0) {
+        return prev.map(t => {
+          const found = allTeachers.find(at => at.id === t.id)
+          return found ? { ...t, fullName: found.fullName } : t
+        })
+      }
+      if (detail.teacherNames?.length > 0) {
+        const matched = allTeachers.filter(at => detail.teacherNames.includes(at.fullName))
+        if (matched.length > 0) {
+          setForm(f => ({ ...f, teacherIds: matched.map(m => m.id) }))
+          return matched
+        }
+      }
+      return prev
+    })
+  }, [detail, allTeachers])
 
   const addTeacher = (teacher) => {
     if (!selectedTeachers.find(t => t.id === teacher.id)) {
@@ -552,7 +610,7 @@ function EditModal({ id, onClose, onSaved }) {
             <p className="text-xs text-ink-500 mt-1">Giáo viên hiện tại: {(detail?.teacherNames || []).join(', ') || 'Chưa có'}</p>
           </div>
 
-          <Field label="Thay đổi giáo viên phụ trách" hint="Để trống nếu muốn giữ nguyên giáo viên cũ">
+          <Field label="Giáo viên phụ trách" hint="Thêm hoặc bớt giáo viên phụ trách khóa học này">
             {selectedTeachers.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {selectedTeachers.map(t => (

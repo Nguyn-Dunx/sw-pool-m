@@ -211,6 +211,9 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         List<String> teacherNames = enrollment.getTeachers().stream()
                 .map(Teacher::getFullName).toList();
 
+        List<UUID> teacherIds = enrollment.getTeachers().stream()
+                .map(Teacher::getId).toList();
+
         int attendedSessions = (int) attendanceRecordRepository.countByEnrollmentId(enrollmentId);
 
         List<AttendanceHistoryResponse> history = attendanceRecordRepository
@@ -230,6 +233,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 .id(enrollment.getId())
                 .studentName(enrollment.getStudent().getFullName())
                 .teacherNames(teacherNames)
+                .teacherIds(teacherIds)
                 .swimStyle(enrollment.getSwimStyle())
                 .isGuaranteed(enrollment.getIsGuaranteed())
                 .totalQuota(enrollment.getTotalQuota())

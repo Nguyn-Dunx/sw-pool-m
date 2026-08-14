@@ -15,6 +15,7 @@ public class EnrollmentDetailResponse {
     private UUID id;
     private String studentName;
     private List<String> teacherNames;
+    private List<UUID> teacherIds;
     private SwimStyle swimStyle;
     private Boolean isGuaranteed;
     private Integer totalQuota;

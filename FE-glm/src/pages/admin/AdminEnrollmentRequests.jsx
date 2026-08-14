@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ClipboardCheck, CheckCircle, XCircle, Eye, Search, Shield, X } from 'lucide-react'
-import { getEnrollmentRequests, reviewEnrollmentRequest, getTeachers } from '../../lib/apiAdmin'
+import { ClipboardCheck, CheckCircle, XCircle, Eye, Search, Shield, X, User } from 'lucide-react'
+import { getEnrollmentRequests, reviewEnrollmentRequest, getTeachers, getEnrollmentDetail } from '../../lib/apiAdmin'
 import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
+import { getTodayDate, addDays, formatDisplayDate, formatISODate } from '../../lib/dateUtils'
+import { useSystemSettings } from '../../lib/settings'
 
 const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
 const STATUS_COLOR = { PENDING: 'amber', APPROVED: 'green', REJECTED: 'red' }
@@ -106,6 +108,11 @@ export default function AdminEnrollmentRequests() {
 // ===== REVIEW MODAL =====
 function ReviewModal({ request, onClose, onDone }) {
   const isPending = request.status === 'PENDING'
+  const { durationDays, defaultQuota } = useSystemSettings()
+
+  const defaultStart = request.startDate || (request.createdAt ? formatISODate(request.createdAt) : getTodayDate())
+  const defaultExpire = request.expireDate || addDays(defaultStart, durationDays)
+  const defaultQuotaStr = request.totalQuota ? String(request.totalQuota) : String(defaultQuota || 12)
 
   const [allTeachers, setAllTeachers] = useState([])
   const [teacherSearch, setTeacherSearch] = useState('')
@@ -115,9 +122,9 @@ function ReviewModal({ request, onClose, onDone }) {
   const [form, setForm] = useState({
     status: 'APPROVED',
     adminNote: request.adminNote || '',
-    totalQuota: request.totalQuota ? String(request.totalQuota) : '',
-    startDate: request.startDate || '',
-    expireDate: request.expireDate || '',
+    totalQuota: defaultQuotaStr,
+    startDate: defaultStart,
+    expireDate: defaultExpire,
     teacherIds: []
   })
   const [selectedTeachers, setSelectedTeachers] = useState([]) // [{id, fullName}]
@@ -129,6 +136,45 @@ function ReviewModal({ request, onClose, onDone }) {
       .then((r) => setAllTeachers(r.content || []))
       .catch(() => setAllTeachers([]))
   }, [debouncedTeacherSearch])
+
+  // Initialize teacher tags
+  useEffect(() => {
+    if (request.requestType === 'CREATE') {
+      // For CREATE: pre-tag proposing teacher
+      if (allTeachers.length > 0) {
+        const proposing = allTeachers.find(
+          t => (request.teacherId && t.id === request.teacherId) || (request.teacherName && t.fullName === request.teacherName)
+        )
+        if (proposing) {
+          setSelectedTeachers([proposing])
+          setForm(f => ({ ...f, teacherIds: [proposing.id] }))
+        } else if (request.teacherId || request.teacherName) {
+          const fallbackTeacher = { id: request.teacherId || 'proposing-teacher', fullName: request.teacherName || 'Giáo viên đề xuất' }
+          setSelectedTeachers([fallbackTeacher])
+          if (request.teacherId) setForm(f => ({ ...f, teacherIds: [request.teacherId] }))
+        }
+      }
+    } else if (request.requestType === 'UPDATE' && request.targetEnrollmentId) {
+      // For UPDATE: load target enrollment's current teachers
+      getEnrollmentDetail(request.targetEnrollmentId)
+        .then((detail) => {
+          let currentTeachers = (detail.teacherIds || []).map((tid, idx) => ({
+            id: tid,
+            fullName: detail.teacherNames?.[idx] || ''
+          }))
+
+          if (currentTeachers.length === 0 && detail.teacherNames?.length > 0 && allTeachers.length > 0) {
+            currentTeachers = allTeachers.filter(at => detail.teacherNames.includes(at.fullName))
+          }
+
+          if (currentTeachers.length > 0) {
+            setSelectedTeachers(currentTeachers)
+            setForm(f => ({ ...f, teacherIds: currentTeachers.map(t => t.id).filter(Boolean) }))
+          }
+        })
+        .catch(() => {})
+    }
+  }, [request, allTeachers])
 
   const addTeacher = (teacher) => {
     if (!selectedTeachers.find(t => t.id === teacher.id)) {
@@ -195,9 +241,9 @@ function ReviewModal({ request, onClose, onDone }) {
             <InfoItem label="GV đề xuất" value={request.teacherName || '—'} />
             <InfoItem label="Kiểu bơi" value={STYLE[request.swimStyle] || request.swimStyle || '—'} />
             <InfoItem label="Cam kết" value={request.isGuaranteed ? 'Có cam kết' : 'Không'} />
-            <InfoItem label="Tổng buổi đề xuất" value={request.totalQuota || 'Mặc định'} />
-            <InfoItem label="Ngày bắt đầu" value={request.startDate || 'Mặc định'} />
-            <InfoItem label="Ngày hết hạn" value={request.expireDate || 'Mặc định'} />
+            <InfoItem label="Tổng buổi" value={`${defaultQuota} buổi ${request.totalQuota ? '' : '(mặc định)'}`} />
+            <InfoItem label="Ngày bắt đầu" value={`${formatDisplayDate(defaultStart)} ${request.startDate ? '' : '(mặc định)'}`} />
+            <InfoItem label="Ngày hết hạn" value={`${formatDisplayDate(defaultExpire)} ${request.expireDate ? '' : '(mặc định)'}`} />
           </div>
           {request.note && (
             <div className="pt-1">
@@ -234,18 +280,30 @@ function ReviewModal({ request, onClose, onDone }) {
             {form.status === 'APPROVED' && (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Field label="Tổng buổi" hint="Để trống = theo đề xuất">
-                    <input type="number" min="1" value={form.totalQuota} onChange={(e) => setForm({ ...form, totalQuota: e.target.value })} className={inputCls} placeholder={request.totalQuota || '12'} />
+                  <Field label="Tổng buổi" hint={`Mặc định: ${defaultQuota} buổi`}>
+                    <input type="number" min="1" value={form.totalQuota} onChange={(e) => setForm({ ...form, totalQuota: e.target.value })} className={inputCls} placeholder={String(defaultQuota)} />
                   </Field>
-                  <Field label="Ngày bắt đầu">
-                    <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className={inputCls} />
+                  <Field label="Ngày bắt đầu" hint="Mặc định: Hôm nay">
+                    <input
+                      type="date"
+                      value={form.startDate}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setForm(f => ({
+                          ...f,
+                          startDate: val,
+                          expireDate: val ? addDays(val, durationDays) : f.expireDate
+                        }))
+                      }}
+                      className={inputCls}
+                    />
                   </Field>
-                  <Field label="Ngày hết hạn">
+                  <Field label="Ngày hết hạn" hint={`Mặc định: +${durationDays} ngày`}>
                     <input type="date" value={form.expireDate} min={form.startDate || undefined} onChange={(e) => setForm({ ...form, expireDate: e.target.value })} className={inputCls} />
                   </Field>
                 </div>
 
-                <Field label="Giáo viên phụ trách" required={request.requestType === 'CREATE'} hint={request.requestType === 'UPDATE' ? 'Để trống = giữ nguyên GV cũ' : 'Chọn GV phụ trách khóa học'}>
+                <Field label="Giáo viên phụ trách" required={request.requestType === 'CREATE'} hint={request.requestType === 'UPDATE' ? 'Tag giáo viên hiện tại (thêm hoặc bấm X để xóa)' : 'Tag sẵn GV gửi yêu cầu (thêm hoặc bấm X để xóa)'}>
                   {/* Selected teachers tags */}
                   {selectedTeachers.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
@@ -264,7 +322,7 @@ function ReviewModal({ request, onClose, onDone }) {
                   <div className="relative">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
                     <input
-                      placeholder="Tìm giáo viên theo tên..."
+                      placeholder="Tìm thêm giáo viên theo tên..."
                       value={teacherSearch}
                       onChange={(e) => { setTeacherSearch(e.target.value); setShowTeacherDropdown(true) }}
                       onFocus={() => setShowTeacherDropdown(true)}
