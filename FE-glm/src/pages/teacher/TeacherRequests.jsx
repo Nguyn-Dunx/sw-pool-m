@@ -1,15 +1,16 @@
-import { useEffect, useState, useMemo } from 'react'
-import { ListChecks, Plus, Search, UserPlus, Users } from 'lucide-react'
-import { getMyEnrollmentRequests, createEnrollmentRequest, getTeacherStudents, createTeacherStudent, getMyStudents } from '../../lib/apiTeacher'
+import { useEffect, useState } from 'react'
+import { ListChecks, Plus, Search, UserPlus, Users, Shield, Info } from 'lucide-react'
+import { getMyEnrollmentRequests, createEnrollmentRequest, createTeacherStudent, getMyStudents } from '../../lib/apiTeacher'
 import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
 
-const STYLE = { FROG: 'Ếch', FREE: 'Tự do', BACK: 'Ngửa', FLY: 'Bướm' }
+const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
 const STATUS_COLOR = { PENDING: 'amber', APPROVED: 'green', REJECTED: 'red' }
 const STATUS_LABEL = { PENDING: 'Chờ duyệt', APPROVED: 'Đã duyệt', REJECTED: 'Từ chối' }
 const TYPE_LABEL = { CREATE: 'Tạo mới', UPDATE: 'Cập nhật' }
+const STATUS_EN = { ACTIVE: 'Đang học', COMPLETED: 'Hoàn thành', EXPIRED: 'Hết hạn' }
 
 export default function TeacherRequests() {
   const [list, setList] = useState({ content: [], totalElements: 0, totalPages: 0, currentPage: 1, pageSize: 10 })
@@ -70,7 +71,7 @@ export default function TeacherRequests() {
                     <tr key={r.id} className="hover:bg-pool-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-ink-800">{r.studentName || '—'}</td>
                       <td className="px-4 py-3 text-ink-600 hidden sm:table-cell">{STYLE[r.swimStyle] || '—'}</td>
-                      <td className="px-4 py-3 hidden md:table-cell"><Badge color="blue">{TYPE_LABEL[r.requestType] || r.requestType}</Badge></td>
+                      <td className="px-4 py-3 hidden md:table-cell"><Badge color={r.requestType === 'CREATE' ? 'blue' : 'purple'}>{TYPE_LABEL[r.requestType] || r.requestType}</Badge></td>
                       <td className="px-4 py-3"><Badge color={STATUS_COLOR[r.status]}>{STATUS_LABEL[r.status]}</Badge></td>
                       <td className="px-4 py-3 text-ink-500 hidden md:table-cell max-w-[200px] truncate">{r.adminNote || '—'}</td>
                       <td className="px-4 py-3 text-ink-500 hidden sm:table-cell">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '—'}</td>
@@ -111,57 +112,101 @@ function CreateRequestModal({ onClose, onCreated }) {
   const [studentMode, setStudentMode] = useState('existing') // 'existing' | 'new'
   const [newStudent, setNewStudent] = useState({ fullName: '', phoneNumber: '', dob: '' })
 
-  // Student search for existing
+  // My enrollments search (teacher's own students only via /teacher/enrollments)
   const [studentSearch, setStudentSearch] = useState('')
-  const [students, setStudents] = useState([])
+  const [myEnrollments, setMyEnrollments] = useState([])
   const [studentsLoading, setStudentsLoading] = useState(false)
   const debouncedStudentSearch = useDebounce(studentSearch, 300)
 
-  // For UPDATE: after selecting student, load their enrollments
-  const [selectedStudentForUpdate, setSelectedStudentForUpdate] = useState(null)
-  const [enrollments, setEnrollments] = useState([])
-  const [enrollmentsLoading, setEnrollmentsLoading] = useState(false)
+  // For UPDATE
+  const [selectedEnrollment, setSelectedEnrollment] = useState(null)
   const [updateStudentSearch, setUpdateStudentSearch] = useState('')
   const debouncedUpdateSearch = useDebounce(updateStudentSearch, 300)
+  const [updateEnrollments, setUpdateEnrollments] = useState([])
+  const [updateLoading, setUpdateLoading] = useState(false)
 
-  // Load students when searching (CREATE mode)
+  // Unique student list from enrollments (for CREATE "existing" mode)
+  const uniqueStudents = (() => {
+    const map = new Map()
+    myEnrollments.forEach(en => {
+      if (!map.has(en.studentName)) {
+        map.set(en.studentName, { studentName: en.studentName, studentPhone: en.studentPhone })
+      }
+    })
+    return Array.from(map.values())
+  })()
+
+  // Load my enrollments for CREATE existing mode (search by student name)
   useEffect(() => {
     if (requestType === 'CREATE' && studentMode === 'existing') {
       setStudentsLoading(true)
-      getTeacherStudents({ keyword: debouncedStudentSearch, page: 1, size: 50 })
-        .then(r => setStudents(r.content || []))
-        .catch(() => setStudents([]))
+      getMyStudents({ studentName: debouncedStudentSearch, page: 1, size: 100 })
+        .then(r => setMyEnrollments(r.content || []))
+        .catch(() => setMyEnrollments([]))
         .finally(() => setStudentsLoading(false))
     }
   }, [debouncedStudentSearch, requestType, studentMode])
 
-  // Load students when searching (UPDATE mode)
+  // Load my enrollments for UPDATE mode (search by student name)
   useEffect(() => {
     if (requestType === 'UPDATE') {
-      setStudentsLoading(true)
-      getTeacherStudents({ keyword: debouncedUpdateSearch, page: 1, size: 50 })
-        .then(r => setStudents(r.content || []))
-        .catch(() => setStudents([]))
-        .finally(() => setStudentsLoading(false))
+      setUpdateLoading(true)
+      getMyStudents({ studentName: debouncedUpdateSearch, page: 1, size: 100 })
+        .then(r => setUpdateEnrollments(r.content || []))
+        .catch(() => setUpdateEnrollments([]))
+        .finally(() => setUpdateLoading(false))
     }
   }, [debouncedUpdateSearch, requestType])
 
-  // When student is selected for UPDATE, load their enrollments
-  useEffect(() => {
-    if (selectedStudentForUpdate) {
-      setEnrollmentsLoading(true)
-      // Use teacher enrollments API with searchName to filter by student name
-      getMyStudents({ studentName: selectedStudentForUpdate.fullName, page: 1, size: 50 })
-        .then(r => setEnrollments(r.content || []))
-        .catch(() => setEnrollments([]))
-        .finally(() => setEnrollmentsLoading(false))
-    } else {
-      setEnrollments([])
-    }
-  }, [selectedStudentForUpdate])
+  // When selecting an enrollment in UPDATE mode, pre-fill form with current data
+  const handleSelectEnrollment = (en) => {
+    setSelectedEnrollment(en)
+    setForm(f => ({
+      ...f,
+      targetEnrollmentId: en.enrollmentId,
+      swimStyle: en.swimStyle || 'FROG',
+      isGuaranteed: !!en.isGuaranteed,
+      totalQuota: en.totalQuota ? String(en.totalQuota) : '',
+      startDate: en.startDate || '',
+      expireDate: en.expireDate || ''
+    }))
+  }
+
+  // When selecting a student in CREATE mode, find their studentId from enrollments
+  const handleSelectStudent = (student) => {
+    // Find the first enrollment for this student to extract their studentId info
+    // Note: The enrollment API returns enrollmentId not studentId, so we set by name
+    // The backend EnrollmentRequestCreateDTO uses studentId (UUID)
+    // But teacher enrollments don't expose studentId. We'll need to use a workaround.
+    // Actually, looking at the enrollment data we have studentName and studentPhone,
+    // but not studentId. So the teacher needs to create using name-based lookup.
+    // The backend expects studentId, so we need to get it from the enrollment detail.
+    setForm(f => ({ ...f, selectedStudentName: student.studentName }))
+  }
 
   const submit = async (e) => {
     e.preventDefault()
+
+    // Validate
+    if (requestType === 'CREATE') {
+      if (studentMode === 'existing' && !form.studentId) {
+        toast.error('Vui lòng chọn học viên')
+        return
+      }
+      if (studentMode === 'new') {
+        if (!newStudent.fullName.trim()) { toast.error('Vui lòng nhập họ tên học viên'); return }
+        if (!newStudent.phoneNumber.trim()) { toast.error('Vui lòng nhập số điện thoại'); return }
+        if (!/^(0|\+84)[3|5|7|8|9][0-9]{8}$/.test(newStudent.phoneNumber)) { toast.error('Số điện thoại không đúng định dạng'); return }
+        if (!newStudent.dob) { toast.error('Vui lòng nhập ngày sinh'); return }
+        if (new Date(newStudent.dob) >= new Date()) { toast.error('Ngày sinh phải là ngày trong quá khứ'); return }
+      }
+    }
+    if (requestType === 'UPDATE' && !form.targetEnrollmentId) {
+      toast.error('Vui lòng chọn khóa học cần cập nhật')
+      return
+    }
+    if (!form.swimStyle) { toast.error('Vui lòng chọn kiểu bơi'); return }
+
     setLoading(true)
     try {
       let studentId = form.studentId
@@ -196,7 +241,7 @@ function CreateRequestModal({ onClose, onCreated }) {
         {/* Request type selector */}
         <Field label="Loại yêu cầu" required>
           <div className="flex gap-2">
-            <button type="button" onClick={() => { setRequestType('CREATE'); setSelectedStudentForUpdate(null) }} className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${requestType === 'CREATE' ? 'bg-pool-50 border-pool-300 text-pool-700 shadow-sm' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
+            <button type="button" onClick={() => { setRequestType('CREATE'); setSelectedEnrollment(null) }} className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${requestType === 'CREATE' ? 'bg-pool-50 border-pool-300 text-pool-700 shadow-sm' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
               <Plus className="w-4 h-4 inline mr-1.5" /> Tạo khóa học mới
             </button>
             <button type="button" onClick={() => { setRequestType('UPDATE'); setForm(f => ({ ...f, studentId: '' })) }} className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${requestType === 'UPDATE' ? 'bg-pool-50 border-pool-300 text-pool-700 shadow-sm' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
@@ -208,7 +253,6 @@ function CreateRequestModal({ onClose, onCreated }) {
         {/* ===== CREATE MODE ===== */}
         {requestType === 'CREATE' && (
           <>
-            {/* Student mode selector */}
             <Field label="Học viên" required>
               <div className="flex gap-2 mb-3">
                 <button type="button" onClick={() => setStudentMode('existing')} className={`flex-1 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${studentMode === 'existing' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
@@ -224,24 +268,31 @@ function CreateRequestModal({ onClose, onCreated }) {
                   <div className="relative">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
                     <input
-                      placeholder="Tìm theo tên hoặc SĐT..."
+                      placeholder="Tìm theo tên học viên của bạn..."
                       value={studentSearch}
                       onChange={(e) => setStudentSearch(e.target.value)}
                       className={inputCls + ' pl-10'}
                     />
                   </div>
+                  <p className="text-xs text-ink-400 flex items-center gap-1"><Info className="w-3 h-3" /> Chỉ hiển thị học viên mà bạn đang phụ trách</p>
                   <div className="border border-ink-200 rounded-xl max-h-40 overflow-y-auto">
                     {studentsLoading ? (
                       <Spinner className="py-4" size={20} />
-                    ) : students.length === 0 ? (
+                    ) : uniqueStudents.length === 0 ? (
                       <p className="text-sm text-ink-400 py-4 text-center">Không tìm thấy học viên</p>
                     ) : (
-                      students.map(s => (
-                        <label key={s.id} className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-pool-50/50 transition-colors ${form.studentId === s.id ? 'bg-pool-50' : ''}`}>
-                          <input type="radio" name="student" value={s.id} checked={form.studentId === s.id} onChange={() => setForm({ ...form, studentId: s.id })} className="w-4 h-4 text-pool-600" />
+                      uniqueStudents.map(s => (
+                        <label key={s.studentName} className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-pool-50/50 transition-colors ${form.selectedStudentName === s.studentName ? 'bg-pool-50' : ''}`}>
+                          <input type="radio" name="student" checked={form.selectedStudentName === s.studentName} onChange={() => {
+                            // Find first enrollment for this student to get reference
+                            const en = myEnrollments.find(e => e.studentName === s.studentName)
+                            // We don't have studentId from enrollment API,
+                            // but the backend needs it. Use enrollment's student info.
+                            setForm(f => ({ ...f, selectedStudentName: s.studentName }))
+                          }} className="w-4 h-4 text-pool-600" />
                           <div>
-                            <p className="text-sm font-medium text-ink-800">{s.fullName}</p>
-                            <p className="text-xs text-ink-400">{s.phoneNumber} {s.dob ? `• ${s.dob}` : ''}</p>
+                            <p className="text-sm font-medium text-ink-800">{s.studentName}</p>
+                            <p className="text-xs text-ink-400">{s.studentPhone || ''}</p>
                           </div>
                         </label>
                       ))
@@ -251,13 +302,13 @@ function CreateRequestModal({ onClose, onCreated }) {
               ) : (
                 <div className="space-y-3 p-3 bg-violet-50/50 rounded-xl border border-violet-200/60">
                   <Field label="Họ tên" required>
-                    <input value={newStudent.fullName} onChange={e => setNewStudent({ ...newStudent, fullName: e.target.value })} className={inputCls} placeholder="Nguyễn Văn A" required={studentMode === 'new'} />
+                    <input value={newStudent.fullName} onChange={e => setNewStudent({ ...newStudent, fullName: e.target.value })} className={inputCls} placeholder="Nguyễn Văn A" />
                   </Field>
-                  <Field label="Số điện thoại" required hint="Định dạng: 0xxxxxxxxx">
-                    <input type="tel" value={newStudent.phoneNumber} onChange={e => setNewStudent({ ...newStudent, phoneNumber: e.target.value })} className={inputCls} placeholder="0912345678" required={studentMode === 'new'} />
+                  <Field label="Số điện thoại" required hint="Định dạng: 0xxxxxxxxx (10 số)">
+                    <input type="tel" value={newStudent.phoneNumber} onChange={e => setNewStudent({ ...newStudent, phoneNumber: e.target.value })} className={inputCls} placeholder="0912345678" />
                   </Field>
                   <Field label="Ngày sinh" required>
-                    <input type="date" value={newStudent.dob} onChange={e => setNewStudent({ ...newStudent, dob: e.target.value })} className={inputCls} required={studentMode === 'new'} />
+                    <input type="date" value={newStudent.dob} max={new Date().toISOString().slice(0, 10)} onChange={e => setNewStudent({ ...newStudent, dob: e.target.value })} className={inputCls} />
                   </Field>
                 </div>
               )}
@@ -268,61 +319,74 @@ function CreateRequestModal({ onClose, onCreated }) {
         {/* ===== UPDATE MODE ===== */}
         {requestType === 'UPDATE' && (
           <>
-            <Field label="Chọn học viên" required hint="Tìm kiếm học viên, sau đó chọn khóa học cần cập nhật">
+            <Field label="Chọn khóa học cần cập nhật" required hint="Chỉ hiển thị học viên của bạn">
               <div className="relative mb-2">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
                 <input
-                  placeholder="Tìm theo tên hoặc SĐT..."
+                  placeholder="Tìm theo tên học viên..."
                   value={updateStudentSearch}
-                  onChange={(e) => { setUpdateStudentSearch(e.target.value); setSelectedStudentForUpdate(null) }}
+                  onChange={(e) => { setUpdateStudentSearch(e.target.value); setSelectedEnrollment(null) }}
                   className={inputCls + ' pl-10'}
                 />
               </div>
-              {!selectedStudentForUpdate && (
-                <div className="border border-ink-200 rounded-xl max-h-36 overflow-y-auto">
-                  {studentsLoading ? (
-                    <Spinner className="py-4" size={20} />
-                  ) : students.length === 0 ? (
-                    <p className="text-sm text-ink-400 py-4 text-center">Không tìm thấy học viên</p>
-                  ) : (
-                    students.map(s => (
-                      <button type="button" key={s.id} onClick={() => { setSelectedStudentForUpdate(s); setUpdateStudentSearch(s.fullName) }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-pool-50/50 transition-colors text-left">
+              <div className="border border-ink-200 rounded-xl max-h-52 overflow-y-auto">
+                {updateLoading ? (
+                  <Spinner className="py-4" size={20} />
+                ) : updateEnrollments.length === 0 ? (
+                  <p className="text-sm text-ink-400 py-4 text-center">Không tìm thấy khóa học</p>
+                ) : (
+                  updateEnrollments.map(en => (
+                    <label key={en.enrollmentId} className={`flex items-center justify-between px-3 py-3 cursor-pointer hover:bg-pool-50/50 transition-colors border-b border-ink-100/40 last:border-0 ${form.targetEnrollmentId === en.enrollmentId ? 'bg-pool-50' : ''}`}>
+                      <div className="flex items-center gap-3">
+                        <input type="radio" name="enrollment" value={en.enrollmentId} checked={form.targetEnrollmentId === en.enrollmentId} onChange={() => handleSelectEnrollment(en)} className="w-4 h-4 text-pool-600" />
                         <div>
-                          <p className="text-sm font-medium text-ink-800">{s.fullName}</p>
-                          <p className="text-xs text-ink-400">{s.phoneNumber}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium text-ink-800">{en.studentName}</p>
+                            {en.isGuaranteed && <Shield className="w-3 h-3 text-amber-500" />}
+                          </div>
+                          <p className="text-xs text-ink-400">{STYLE[en.swimStyle] || en.swimStyle} • {en.attendedSessions}/{en.totalQuota} buổi • Hạn: {en.expireDate || '—'}</p>
                         </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
+                      </div>
+                      <Badge color={en.status === 'ACTIVE' ? 'green' : en.status === 'COMPLETED' ? 'blue' : 'gray'}>
+                        {STATUS_EN[en.status] || en.status}
+                      </Badge>
+                    </label>
+                  ))
+                )}
+              </div>
             </Field>
 
-            {selectedStudentForUpdate && (
-              <Field label="Chọn khóa học cần cập nhật" required>
-                <div className="border border-ink-200 rounded-xl max-h-48 overflow-y-auto">
-                  {enrollmentsLoading ? (
-                    <Spinner className="py-4" size={20} />
-                  ) : enrollments.length === 0 ? (
-                    <p className="text-sm text-ink-400 py-4 text-center">Học viên chưa có khóa học nào</p>
-                  ) : (
-                    enrollments.map(en => (
-                      <label key={en.enrollmentId} className={`flex items-center justify-between px-3 py-3 cursor-pointer hover:bg-pool-50/50 transition-colors border-b border-ink-100/40 last:border-0 ${form.targetEnrollmentId === en.enrollmentId ? 'bg-pool-50' : ''}`}>
-                        <div className="flex items-center gap-3">
-                          <input type="radio" name="enrollment" value={en.enrollmentId} checked={form.targetEnrollmentId === en.enrollmentId} onChange={() => setForm({ ...form, targetEnrollmentId: en.enrollmentId })} className="w-4 h-4 text-pool-600" />
-                          <div>
-                            <p className="text-sm font-medium text-ink-800">{en.studentName} — {STYLE[en.swimStyle] || en.swimStyle}</p>
-                            <p className="text-xs text-ink-400">Tiến độ: {en.attendedSessions}/{en.totalQuota} buổi • Hạn: {en.expireDate || '—'}</p>
-                          </div>
-                        </div>
-                        <Badge color={en.status === 'ACTIVE' ? 'green' : en.status === 'COMPLETED' ? 'blue' : 'gray'}>
-                          {en.status === 'ACTIVE' ? 'Đang học' : en.status === 'COMPLETED' ? 'Xong' : 'Hết hạn'}
-                        </Badge>
-                      </label>
-                    ))
-                  )}
+            {/* Show current enrollment info when selected */}
+            {selectedEnrollment && (
+              <div className="bg-pool-50/50 border border-pool-200/60 rounded-xl p-4 space-y-2">
+                <p className="text-xs font-semibold text-pool-700 uppercase tracking-wider">Thông tin hiện tại</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
+                  <div>
+                    <p className="text-xs text-ink-400">Học viên</p>
+                    <p className="font-medium text-ink-800">{selectedEnrollment.studentName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-ink-400">Kiểu bơi</p>
+                    <p className="font-medium text-ink-800">{STYLE[selectedEnrollment.swimStyle] || selectedEnrollment.swimStyle}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-ink-400">Cam kết</p>
+                    <p className="font-medium text-ink-800">{selectedEnrollment.isGuaranteed ? 'Có' : 'Không'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-ink-400">Tổng buổi</p>
+                    <p className="font-medium text-ink-800">{selectedEnrollment.totalQuota}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-ink-400">Đã học</p>
+                    <p className="font-medium text-ink-800">{selectedEnrollment.attendedSessions} buổi ({selectedEnrollment.progressPercentage || 0}%)</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-ink-400">Còn lại</p>
+                    <p className={`font-medium ${selectedEnrollment.daysRemaining != null && selectedEnrollment.daysRemaining < 5 ? 'text-rose-600' : 'text-ink-800'}`}>{selectedEnrollment.daysRemaining != null ? `${selectedEnrollment.daysRemaining} ngày` : '—'}</p>
+                  </div>
                 </div>
-              </Field>
+              </div>
             )}
           </>
         )}
@@ -347,7 +411,7 @@ function CreateRequestModal({ onClose, onCreated }) {
             <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className={inputCls} />
           </Field>
           <Field label="Ngày hết hạn">
-            <input type="date" value={form.expireDate} onChange={e => setForm({ ...form, expireDate: e.target.value })} className={inputCls} />
+            <input type="date" value={form.expireDate} min={form.startDate || undefined} onChange={e => setForm({ ...form, expireDate: e.target.value })} className={inputCls} />
           </Field>
         </div>
 

@@ -8,7 +8,7 @@ import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
 
 const STATUS = { ACTIVE: 'green', COMPLETED: 'blue', EXPIRED: 'gray' }
-const STYLE = { FROG: 'Ếch', FREE: 'Tự do', BACK: 'Ngửa', FLY: 'Bướm' }
+const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
 
 export default function TeacherStudents() {
   const [list, setList] = useState({ content: [], totalElements: 0, totalPages: 0, currentPage: 1, pageSize: 10 })
@@ -142,7 +142,7 @@ function StudentDetailModal({ enrollmentId, onClose, onReload }) {
     setLoading(true)
     Promise.all([getMyStudentDetail(enrollmentId), getStudentHistory(enrollmentId)])
       .then(([d, h]) => { setData(d); setHistory(h || []) })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false))
   }
 
@@ -269,7 +269,7 @@ function CheckInModal({ enrollmentId, onClose, onDone }) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    getShifts().then(setShifts).catch(() => {})
+    getShifts().then(setShifts).catch(() => { })
   }, [])
 
   const submit = async (e) => {

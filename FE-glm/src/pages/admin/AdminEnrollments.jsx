@@ -7,7 +7,7 @@ import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
 
 const STATUS = { ACTIVE: 'green', COMPLETED: 'blue', EXPIRED: 'gray' }
-const STYLE = { FROG: 'Ếch', FREE: 'Tự do', BACK: 'Ngửa', FLY: 'Bướm' }
+const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
 
 export default function AdminEnrollments() {
   const [list, setList] = useState({ content: [], totalElements: 0, totalPages: 0, currentPage: 1, pageSize: 10 })
@@ -127,7 +127,7 @@ function DetailModal({ id, onClose }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getEnrollmentDetail(id).then(setData).catch(() => {}).finally(() => setLoading(false))
+    getEnrollmentDetail(id).then(setData).catch(() => { }).finally(() => setLoading(false))
   }, [id])
 
   const handleComplete = async () => {
@@ -201,8 +201,8 @@ function CreateModal({ onClose, onCreated }) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    getStudents({ page: 1, size: 100 }).then(r => setStudents(r.content)).catch(() => {})
-    getTeachers({ page: 1, size: 100 }).then(r => setTeachers(r.content)).catch(() => {})
+    getStudents({ page: 1, size: 100 }).then(r => setStudents(r.content)).catch(() => { })
+    getTeachers({ page: 1, size: 100 }).then(r => setTeachers(r.content)).catch(() => { })
   }, [])
 
   const submit = async (e) => {
