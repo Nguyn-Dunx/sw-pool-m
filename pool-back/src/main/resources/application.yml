@@ -21,9 +21,12 @@ spring:
 
   flyway:
     enabled: true
-    validate-on-migrate: false
-    baseline-on-migrate: true
-    out-of-order: true
+    validate-migration-naming: true
+
+  messages:
+    basename: messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
 
 server:
   port: ${PORT:8080}
