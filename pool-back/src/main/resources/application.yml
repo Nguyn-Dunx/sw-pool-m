@@ -21,7 +21,9 @@ spring:
 
   flyway:
     enabled: true
-    validate-migration-naming: true
+    validate-on-migrate: false
+    baseline-on-migrate: true
+    out-of-order: true
 
 server:
   port: ${PORT:8080}

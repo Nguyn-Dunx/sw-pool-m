@@ -23,6 +23,9 @@ public class TeacherProfileEnricher implements UserProfileEnricher {
     @Override
     public void enrich(AuthResponse response, User user) {
         teacherRepository.findByUserId(user.getId())
-                .ifPresent(teacher -> response.setTeacherId(teacher.getId()));
+                .ifPresent(teacher -> {
+                    response.setTeacherId(teacher.getId());
+                    response.setFullName(teacher.getFullName());
+                });
     }
 }

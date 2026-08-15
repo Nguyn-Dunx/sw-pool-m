@@ -34,6 +34,10 @@ public class AuthService {
                 .filter(enricher -> enricher.supports(response.getRole()))
                 .forEach(enricher -> enricher.enrich(response, user));
 
+        if (response.getFullName() == null && "ROLE_ADMIN".equals(response.getRole())) {
+            response.setFullName("Ban Quản trị");
+        }
+
         return response;
     }
 }

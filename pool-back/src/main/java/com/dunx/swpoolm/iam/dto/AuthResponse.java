@@ -18,4 +18,5 @@ public class AuthResponse {
     private String phoneNumber;
     private String role;
     private UUID teacherId;
+    private String fullName;
 }

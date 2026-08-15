@@ -41,11 +41,12 @@ class AuthServiceTest {
         assertThat(response.getUserId()).isEqualTo(user.getId());
         assertThat(response.getPhoneNumber()).isEqualTo("0988888888");
         assertThat(response.getRole()).isEqualTo("ROLE_ADMIN");
+        assertThat(response.getFullName()).isEqualTo("Ban Quản trị");
         assertThat(response.getTeacherId()).isNull();
     }
 
     @Test
-    @DisplayName("buildAuthResponse chạy qua UserProfileEnricher để gắn teacherId cho Teacher")
+    @DisplayName("buildAuthResponse chạy qua UserProfileEnricher để gắn teacherId và fullName cho Teacher")
     void buildAuthResponse_forTeacher_runsEnricher() {
         UUID teacherId = UUID.randomUUID();
         Role role = Role.builder().id(2).roleName("ROLE_TEACHER").build();
@@ -61,6 +62,7 @@ class AuthServiceTest {
         doAnswer(invocation -> {
             AuthResponse resp = invocation.getArgument(0);
             resp.setTeacherId(teacherId);
+            resp.setFullName("Thầy Nguyễn Văn A");
             return null;
         }).when(teacherEnricher).enrich(any(AuthResponse.class), eq(user));
 
@@ -71,6 +73,7 @@ class AuthServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getRole()).isEqualTo("ROLE_TEACHER");
         assertThat(response.getTeacherId()).isEqualTo(teacherId);
+        assertThat(response.getFullName()).isEqualTo("Thầy Nguyễn Văn A");
         verify(teacherEnricher).enrich(any(), eq(user));
     }
 
