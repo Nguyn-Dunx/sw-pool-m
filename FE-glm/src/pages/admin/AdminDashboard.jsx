@@ -1,23 +1,33 @@
 import { useEffect, useState } from 'react'
-import { Users, GraduationCap, UserCircle, TrendingUp, Activity } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Users, UserCircle, TrendingUp, Activity, ArrowUpRight } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
 import { getAdminDashboard } from '../../lib/apiAdmin'
 import { Spinner, Badge } from '../../components/ui'
 
-function StatCard({ icon: Icon, label, value, color, delay = 0 }) {
+function StatCard({ icon: Icon, label, value, color, to, description, delay = 0 }) {
   return (
-    <div
-      className="bg-white rounded-2xl border border-ink-100/60 p-5 flex items-center gap-4 card-hover animate-fade-in-up"
+    <Link
+      to={to}
+      className="group bg-white rounded-2xl border border-ink-100/70 p-5 flex items-center justify-between gap-4 card-hover hover:border-pool-300/80 hover:shadow-lg hover:shadow-pool-100/40 transition-all duration-200 animate-fade-in-up"
       style={{ animationDelay: `${delay}s` }}
     >
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${color}`}>
-        <Icon className="w-6 h-6" />
+      <div className="flex items-center gap-4 min-w-0">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${color} group-hover:scale-105 transition-transform duration-200 shrink-0`}>
+          <Icon className="w-6 h-6" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm text-ink-500 font-medium truncate">{label}</p>
+          <p className="text-2xl font-bold text-ink-900 tracking-tight">{value ?? '—'}</p>
+          {description && (
+            <p className="text-xs text-ink-400 mt-0.5 group-hover:text-pool-600 transition-colors">{description}</p>
+          )}
+        </div>
       </div>
-      <div>
-        <p className="text-sm text-ink-500 font-medium">{label}</p>
-        <p className="text-2xl font-bold text-ink-900 tracking-tight">{value ?? '—'}</p>
+      <div className="w-8 h-8 rounded-lg bg-ink-50 flex items-center justify-center text-ink-400 group-hover:bg-pool-50 group-hover:text-pool-600 transition-all duration-200 shrink-0">
+        <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
       </div>
-    </div>
+    </Link>
   )
 }
 
@@ -42,9 +52,33 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard icon={Users} label="Học viên đang học" value={data.totalActiveStudents} color="bg-pool-100 text-pool-700" delay={0.05} />
-        <StatCard icon={UserCircle} label="Giáo viên hoạt động" value={data.totalActiveTeachers} color="bg-emerald-100 text-emerald-700" delay={0.1} />
-        <StatCard icon={TrendingUp} label="Đăng ký tháng này" value={data.newEnrollmentsThisMonth} color="bg-amber-100 text-amber-700" delay={0.15} />
+        <StatCard
+          icon={Users}
+          label="Học viên đang học"
+          value={data.totalActiveStudents}
+          color="bg-pool-100 text-pool-700"
+          to="/admin/enrollments?status=ACTIVE"
+          description="Xem danh sách khóa học"
+          delay={0.05}
+        />
+        <StatCard
+          icon={UserCircle}
+          label="Giáo viên hoạt động"
+          value={data.totalActiveTeachers}
+          color="bg-emerald-100 text-emerald-700"
+          to="/admin/teachers"
+          description="Quản lý đội ngũ giáo viên"
+          delay={0.1}
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Đăng ký tháng này"
+          value={data.newEnrollmentsThisMonth}
+          color="bg-amber-100 text-amber-700"
+          to="/admin/enrollments"
+          description="Tất cả các khóa đăng ký"
+          delay={0.15}
+        />
       </div>
 
       <div className="bg-white rounded-2xl border border-ink-100/60 p-5 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>

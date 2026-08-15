@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { GraduationCap, Plus, Search, Eye, CheckCircle, Pencil, X, Shield, Users } from 'lucide-react'
 import { getEnrollments, getEnrollmentDetail, createEnrollment, updateEnrollment, completeEnrollment, getStudents, getTeachers } from '../../lib/apiAdmin'
 import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls } from '../../components/ui'
@@ -12,15 +13,21 @@ const STATUS = { ACTIVE: 'green', COMPLETED: 'blue', EXPIRED: 'gray' }
 const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
 
 export default function AdminEnrollments() {
+  const [searchParams] = useSearchParams()
   const [list, setList] = useState({ content: [], totalElements: 0, totalPages: 0, currentPage: 1, pageSize: 10 })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState(searchParams.get('status') || '')
   const [swimStyle, setSwimStyle] = useState('')
   const [page, setPage] = useState(1)
   const [detail, setDetail] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
+
+  useEffect(() => {
+    const s = searchParams.get('status')
+    if (s !== null) setStatus(s)
+  }, [searchParams])
 
   const debouncedSearch = useDebounce(search, 350)
 

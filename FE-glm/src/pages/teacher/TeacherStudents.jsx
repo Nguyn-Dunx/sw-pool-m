@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Users, Search, Eye, Calendar, CheckCircle, ChevronDown, ChevronUp, Shield } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { getMyStudents, getMyStudentDetail, getStudentHistory, checkInStudent, getShifts, completeMyEnrollment } from '../../lib/apiTeacher'
 import { Badge, Button, Spinner, EmptyState, Pagination, Modal, Field, inputCls } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
@@ -11,12 +11,18 @@ const STATUS = { ACTIVE: 'green', COMPLETED: 'blue', EXPIRED: 'gray' }
 const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
 
 export default function TeacherStudents() {
+  const [searchParams] = useSearchParams()
   const [list, setList] = useState({ content: [], totalElements: 0, totalPages: 0, currentPage: 1, pageSize: 10 })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState(searchParams.get('status') || '')
   const [page, setPage] = useState(1)
   const [detailId, setDetailId] = useState(null) // enrollment ID for detail modal
+
+  useEffect(() => {
+    const s = searchParams.get('status')
+    if (s !== null) setStatus(s)
+  }, [searchParams])
 
   const debouncedSearch = useDebounce(search, 350)
 
