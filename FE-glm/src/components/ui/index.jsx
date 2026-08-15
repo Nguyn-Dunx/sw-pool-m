@@ -171,3 +171,6 @@ export function Field({ label, required, error, children, hint }) {
 }
 
 export const inputCls = 'w-full px-3.5 py-2.5 rounded-xl border border-ink-200 bg-white text-ink-800 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-pool-400/30 focus:border-pool-400 transition-all duration-200 text-sm'
+
+// ===== ColumnHeaderFilter & ActiveFilterChips =====
+export { ColumnHeaderFilter, ActiveFilterChips } from './ColumnFilter'

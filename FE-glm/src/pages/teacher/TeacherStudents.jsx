@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Users, Search, Eye, Calendar, CheckCircle, ChevronDown, ChevronUp, Shield } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Users, Eye, Calendar, CheckCircle, ChevronDown, ChevronUp, Shield } from 'lucide-react'
 import { getMyStudents, getMyStudentDetail, getStudentHistory, checkInStudent, getShifts, completeMyEnrollment } from '../../lib/apiTeacher'
-import { Badge, Button, Spinner, EmptyState, Pagination, Modal, Field, inputCls } from '../../components/ui'
+import { Badge, Button, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
@@ -16,6 +16,8 @@ export default function TeacherStudents() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState(searchParams.get('status') || '')
+  const [swimStyle, setSwimStyle] = useState('')
+  const [isGuaranteed, setIsGuaranteed] = useState('')
   const [page, setPage] = useState(1)
   const [detailId, setDetailId] = useState(null) // enrollment ID for detail modal
 
@@ -28,56 +30,125 @@ export default function TeacherStudents() {
 
   const load = () => {
     setLoading(true)
-    getMyStudents({ studentName: debouncedSearch, status, page, size: 10 })
+    getMyStudents({
+      searchName: debouncedSearch,
+      status,
+      swimStyle,
+      isGuaranteed: isGuaranteed === '' ? undefined : isGuaranteed === 'true' || isGuaranteed === true,
+      page,
+      size: 10
+    })
       .then(setList)
       .catch((e) => toast.error(errMsg(e)))
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { setPage(1) }, [debouncedSearch, status])
-  useEffect(() => { load() }, [debouncedSearch, status, page])
+  useEffect(() => { setPage(1) }, [debouncedSearch, status, swimStyle, isGuaranteed])
+  useEffect(() => { load() }, [debouncedSearch, status, swimStyle, isGuaranteed, page])
+
+  const hasAnyFilter = Boolean(search || status || swimStyle || isGuaranteed !== '')
 
   return (
     <div className="space-y-4">
       <div className="animate-fade-in">
         <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Học viên của tôi</h1>
-        <p className="text-sm text-ink-500 mt-1">Danh sách học viên đang phụ trách</p>
+        <p className="text-sm text-ink-500 mt-1">Danh sách học viên đang phụ trách — Nhấn vào biểu tượng lọc ở từng tiêu đề cột để lọc</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-ink-100/60 p-4 flex flex-wrap gap-3 animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
-          <input
-            placeholder="Tên học viên..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={inputCls + ' pl-10'}
-          />
-        </div>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputCls + ' w-auto'}>
-          <option value="">Tất cả trạng thái</option>
-          <option value="ACTIVE">Đang học</option>
-          <option value="COMPLETED">Hoàn thành</option>
-          <option value="EXPIRED">Hết hạn</option>
-        </select>
-      </div>
+      {/* Thanh hiển thị các bộ lọc đang kích hoạt */}
+      <ActiveFilterChips
+        filters={[
+          { label: 'Học viên', value: search, onRemove: () => setSearch('') },
+          { label: 'Kiểu bơi', value: swimStyle, displayValue: STYLE[swimStyle] ? `Bơi ${STYLE[swimStyle]}` : swimStyle, onRemove: () => setSwimStyle('') },
+          { label: 'Cam kết', value: isGuaranteed, displayValue: isGuaranteed === 'true' ? 'Cam kết' : isGuaranteed === 'false' ? 'Thường' : '', onRemove: () => setIsGuaranteed('') },
+          { label: 'Trạng thái', value: status, displayValue: status === 'ACTIVE' ? 'Đang học' : status === 'COMPLETED' ? 'Hoàn thành' : status === 'EXPIRED' ? 'Hết hạn' : '', onRemove: () => setStatus('') },
+        ]}
+        onClearAll={() => {
+          setSearch('')
+          setSwimStyle('')
+          setIsGuaranteed('')
+          setStatus('')
+        }}
+      />
 
-      <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+      <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
         {loading ? <Spinner className="py-20" size={32} /> : list.content.length === 0 ? (
-          <EmptyState icon={Users} title="Chưa có học viên" description="Bạn chưa phụ trách học viên nào." />
+          <EmptyState
+            icon={Users}
+            title={hasAnyFilter ? 'Không tìm thấy kết quả phù hợp' : 'Chưa có học viên'}
+            description={hasAnyFilter ? 'Không có học viên nào khớp với bộ lọc đã chọn. Hãy thử điều chỉnh lại bộ lọc.' : 'Bạn chưa phụ trách học viên nào.'}
+            action={hasAnyFilter ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setSearch('')
+                  setSwimStyle('')
+                  setIsGuaranteed('')
+                  setStatus('')
+                }}
+              >
+                Xóa tất cả bộ lọc
+              </Button>
+            ) : null}
+          />
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-ink-50/80 text-ink-500 text-left">
+                <thead className="bg-ink-50/80 text-ink-500 text-left border-b border-ink-100/60">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Học viên</th>
-                    <th className="px-4 py-3 font-semibold hidden sm:table-cell">Kiểu bơi</th>
-                    <th className="px-4 py-3 font-semibold">Cam kết</th>
-                    <th className="px-4 py-3 font-semibold">Tiến độ</th>
-                    <th className="px-4 py-3 font-semibold hidden md:table-cell">Còn lại</th>
-                    <th className="px-4 py-3 font-semibold">Trạng thái</th>
-                    <th className="px-4 py-3 font-semibold text-right">Thao tác</th>
+                    <th className="px-4 py-3">
+                      <ColumnHeaderFilter
+                        label="Học viên"
+                        type="search"
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Tìm tên học viên..."
+                      />
+                    </th>
+                    <th className="px-4 py-3 hidden sm:table-cell">
+                      <ColumnHeaderFilter
+                        label="Kiểu bơi"
+                        type="select"
+                        value={swimStyle}
+                        onChange={setSwimStyle}
+                        options={[
+                          { value: 'FROG', label: 'Bơi ếch' },
+                          { value: 'FREE', label: 'Bơi sải' },
+                          { value: 'BACK', label: 'Bơi ngửa' },
+                          { value: 'FLY', label: 'Bơi bướm' },
+                        ]}
+                      />
+                    </th>
+                    <th className="px-4 py-3">
+                      <ColumnHeaderFilter
+                        label="Cam kết"
+                        type="select"
+                        value={isGuaranteed}
+                        onChange={setIsGuaranteed}
+                        options={[
+                          { value: 'true', label: 'Cam kết', badgeColor: 'amber' },
+                          { value: 'false', label: 'Thường', badgeColor: 'gray' },
+                        ]}
+                      />
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-ink-600">Tiến độ</th>
+                    <th className="px-4 py-3 font-semibold text-ink-600 hidden md:table-cell">Còn lại</th>
+                    <th className="px-4 py-3">
+                      <ColumnHeaderFilter
+                        label="Trạng thái"
+                        type="select"
+                        value={status}
+                        onChange={setStatus}
+                        options={[
+                          { value: 'ACTIVE', label: 'Đang học', badgeColor: 'green' },
+                          { value: 'COMPLETED', label: 'Hoàn thành', badgeColor: 'blue' },
+                          { value: 'EXPIRED', label: 'Hết hạn', badgeColor: 'gray' },
+                        ]}
+                      />
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-ink-600 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100/60">
@@ -87,7 +158,7 @@ export default function TeacherStudents() {
                         <p className="font-medium text-ink-800">{s.studentName}</p>
                         <p className="text-xs text-ink-400">{s.studentPhone || ''}</p>
                       </td>
-                      <td className="px-4 py-3 text-ink-600 hidden sm:table-cell">{STYLE[s.swimStyle] || s.swimStyle}</td>
+                      <td className="px-4 py-3 text-ink-600 hidden sm:table-cell font-medium">Bơi {STYLE[s.swimStyle] || s.swimStyle}</td>
                       <td className="px-4 py-3">
                         {s.isGuaranteed ? (
                           <Badge color="amber">
@@ -107,7 +178,7 @@ export default function TeacherStudents() {
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         {s.daysRemaining != null && (
-                          <span className={`font-medium text-sm ${s.daysRemaining < 5 ? 'text-rose-600' : 'text-ink-600'}`}>
+                          <span className={`font-medium text-sm ${s.daysRemaining < 5 ? 'text-rose-600 font-semibold' : 'text-ink-600'}`}>
                             {s.daysRemaining} ngày
                           </span>
                         )}

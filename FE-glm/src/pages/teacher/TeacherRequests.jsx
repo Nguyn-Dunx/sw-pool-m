@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ListChecks, Plus, Search, UserPlus, Users, Shield, Info, Eye } from 'lucide-react'
 import { getMyEnrollmentRequests, createEnrollmentRequest, getTeacherStudents, createTeacherStudent, getMyStudents } from '../../lib/apiTeacher'
-import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls } from '../../components/ui'
+import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
@@ -18,63 +18,106 @@ export default function TeacherRequests() {
   const [list, setList] = useState({ content: [], totalElements: 0, totalPages: 0, currentPage: 1, pageSize: 10 })
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
+  const [requestType, setRequestType] = useState('')
   const [page, setPage] = useState(1)
   const [showCreate, setShowCreate] = useState(false)
   const [detail, setDetail] = useState(null)
 
   const load = () => {
     setLoading(true)
-    getMyEnrollmentRequests({ status, page, size: 10 })
+    getMyEnrollmentRequests({ requestType: requestType || undefined, status: status || undefined, page, size: 10 })
       .then(setList)
       .catch((e) => toast.error(errMsg(e)))
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { setPage(1) }, [status])
-  useEffect(() => { load() }, [status, page])
+  useEffect(() => { setPage(1) }, [status, requestType])
+  useEffect(() => { load() }, [status, requestType, page])
+
+  const filteredContent = list.content.filter((r) => {
+    if (status && r.status !== status) return false
+    return true
+  })
+
+  const hasAnyFilter = Boolean(status || requestType)
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Yêu cầu đăng ký</h1>
-          <p className="text-sm text-ink-500 mt-1">Gửi yêu cầu tạo/cập nhật khóa học cho Admin duyệt</p>
+          <p className="text-sm text-ink-500 mt-1">Gửi yêu cầu tạo/cập nhật khóa học cho Admin duyệt — Lọc trực tiếp trên từng cột</p>
         </div>
         <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" /> Tạo yêu cầu</Button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-ink-100/60 p-4 animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputCls + ' w-auto'}>
-          <option value="">Tất cả trạng thái</option>
-          <option value="PENDING">Chờ duyệt</option>
-          <option value="APPROVED">Đã duyệt</option>
-          <option value="REJECTED">Từ chối</option>
-        </select>
-      </div>
+      {/* Thanh hiển thị các bộ lọc đang kích hoạt */}
+      <ActiveFilterChips
+        filters={[
+          { label: 'Loại yêu cầu', value: requestType, displayValue: TYPE_LABEL[requestType], onRemove: () => setRequestType('') },
+          { label: 'Trạng thái', value: status, displayValue: STATUS_LABEL[status], onRemove: () => setStatus('') },
+        ]}
+        onClearAll={() => {
+          setStatus('')
+          setRequestType('')
+        }}
+      />
 
-      <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-        {loading ? <Spinner className="py-20" size={32} /> : list.content.length === 0 ? (
-          <EmptyState icon={ListChecks} title="Chưa có yêu cầu" description="Tạo yêu cầu đăng ký khóa học đầu tiên." />
+      <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+        {loading ? <Spinner className="py-20" size={32} /> : filteredContent.length === 0 ? (
+          <EmptyState
+            icon={ListChecks}
+            title={hasAnyFilter ? 'Không tìm thấy yêu cầu phù hợp' : 'Chưa có yêu cầu'}
+            description={hasAnyFilter ? 'Không có yêu cầu nào khớp với bộ lọc đã chọn.' : 'Tạo yêu cầu đăng ký khóa học đầu tiên.'}
+            action={hasAnyFilter ? (
+              <Button variant="secondary" size="sm" onClick={() => { setStatus(''); setRequestType('') }}>
+                Xóa tất cả bộ lọc
+              </Button>
+            ) : null}
+          />
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-ink-50/80 text-ink-500 text-left">
+                <thead className="bg-ink-50/80 text-ink-500 text-left border-b border-ink-100/60">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Học viên</th>
-                    <th className="px-4 py-3 font-semibold hidden sm:table-cell">Kiểu bơi</th>
-                    <th className="px-4 py-3 font-semibold hidden md:table-cell">Loại</th>
-                    <th className="px-4 py-3 font-semibold">Trạng thái</th>
-                    <th className="px-4 py-3 font-semibold hidden md:table-cell">Ghi chú Admin</th>
-                    <th className="px-4 py-3 font-semibold hidden sm:table-cell">Ngày tạo</th>
-                    <th className="px-4 py-3 font-semibold text-right">Thao tác</th>
+                    <th className="px-4 py-3 font-semibold text-ink-600">Học viên</th>
+                    <th className="px-4 py-3 font-semibold text-ink-600 hidden sm:table-cell">Kiểu bơi</th>
+                    <th className="px-4 py-3 hidden md:table-cell">
+                      <ColumnHeaderFilter
+                        label="Loại"
+                        type="select"
+                        value={requestType}
+                        onChange={setRequestType}
+                        options={[
+                          { value: 'CREATE', label: 'Tạo mới', badgeColor: 'blue' },
+                          { value: 'UPDATE', label: 'Cập nhật', badgeColor: 'purple' },
+                        ]}
+                      />
+                    </th>
+                    <th className="px-4 py-3">
+                      <ColumnHeaderFilter
+                        label="Trạng thái"
+                        type="select"
+                        value={status}
+                        onChange={setStatus}
+                        options={[
+                          { value: 'PENDING', label: 'Chờ duyệt', badgeColor: 'amber' },
+                          { value: 'APPROVED', label: 'Đã duyệt', badgeColor: 'green' },
+                          { value: 'REJECTED', label: 'Từ chối', badgeColor: 'red' },
+                        ]}
+                      />
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-ink-600 hidden md:table-cell">Ghi chú Admin</th>
+                    <th className="px-4 py-3 font-semibold text-ink-600 hidden sm:table-cell">Ngày tạo</th>
+                    <th className="px-4 py-3 font-semibold text-ink-600 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100/60">
-                  {list.content.map((r) => (
+                  {filteredContent.map((r) => (
                     <tr key={r.id} className="hover:bg-pool-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-ink-800">{r.studentName || '—'}</td>
-                      <td className="px-4 py-3 text-ink-600 hidden sm:table-cell">{STYLE[r.swimStyle] || '—'}</td>
+                      <td className="px-4 py-3 text-ink-600 hidden sm:table-cell font-medium">Bơi {STYLE[r.swimStyle] || '—'}</td>
                       <td className="px-4 py-3 hidden md:table-cell"><Badge color={r.requestType === 'CREATE' ? 'blue' : 'purple'}>{TYPE_LABEL[r.requestType] || r.requestType}</Badge></td>
                       <td className="px-4 py-3"><Badge color={STATUS_COLOR[r.status]}>{STATUS_LABEL[r.status]}</Badge></td>
                       <td className="px-4 py-3 text-ink-500 hidden md:table-cell max-w-[200px] truncate">{r.adminNote || '—'}</td>
@@ -90,7 +133,7 @@ export default function TeacherRequests() {
               </table>
             </div>
             <div className="p-4 border-t border-ink-100/60">
-              <p className="text-xs text-ink-400 mb-3">Tổng {list.totalElements} yêu cầu</p>
+              <p className="text-xs text-ink-400 mb-3">Tổng {filteredContent.length} yêu cầu</p>
               <Pagination page={list.currentPage} totalPages={list.totalPages} onChange={setPage} />
             </div>
           </>
@@ -98,6 +141,7 @@ export default function TeacherRequests() {
       </div>
 
       {showCreate && <CreateRequestModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />}
+
       {detail && <DetailModal request={detail} onClose={() => setDetail(null)} />}
     </div>
   )
