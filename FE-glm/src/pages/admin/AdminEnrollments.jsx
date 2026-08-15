@@ -171,11 +171,9 @@ export default function AdminEnrollments() {
                           <button onClick={() => setDetail(e.id)} className="p-1.5 rounded-lg text-pool-600 hover:bg-pool-50 transition-colors" title="Xem chi tiết">
                             <Eye className="w-4 h-4" />
                           </button>
-                          {e.status === 'ACTIVE' && (
-                            <button onClick={() => setEditingId(e.id)} className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors" title="Sửa khóa học">
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                          )}
+                          <button onClick={() => setEditingId(e.id)} className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors" title="Sửa khóa học / Trạng thái">
+                            <Pencil className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -276,16 +274,16 @@ function DetailModal({ id, onClose, onEdit, onReload }) {
             </div>
           )}
 
-          {data.status === 'ACTIVE' && (
-            <div className="flex gap-3 pt-2">
-              <Button type="button" variant="outline" onClick={() => onEdit(data.id)} className="flex-1">
-                <Pencil className="w-4 h-4" /> Sửa thông tin
-              </Button>
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={() => onEdit(data.id)} className="flex-1">
+              <Pencil className="w-4 h-4" /> Sửa thông tin / Trạng thái
+            </Button>
+            {data.status === 'ACTIVE' && (
               <Button variant="danger" onClick={handleComplete} className="flex-1">
                 <CheckCircle className="w-4 h-4" /> Đóng khóa học
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       ) : <p className="text-ink-500">Không tìm thấy dữ liệu.</p>}
     </Modal>
@@ -559,7 +557,8 @@ function EditModal({ id, onClose, onSaved }) {
     swimStyle: 'FROG',
     isGuaranteed: false,
     totalQuota: '',
-    expireDate: ''
+    expireDate: '',
+    status: 'ACTIVE'
   })
   const [selectedTeachers, setSelectedTeachers] = useState([])
   const [loading, setLoading] = useState(false)
@@ -587,7 +586,8 @@ function EditModal({ id, onClose, onSaved }) {
           swimStyle: d.swimStyle || 'FROG',
           isGuaranteed: !!d.isGuaranteed,
           totalQuota: d.totalQuota ? String(d.totalQuota) : String(defaultQuota),
-          expireDate: d.expireDate || addDays(d.startDate || getTodayDate(), durationDays)
+          expireDate: d.expireDate || addDays(d.startDate || getTodayDate(), durationDays),
+          status: d.status || 'ACTIVE'
         })
       })
       .catch((e) => toast.error(errMsg(e)))
@@ -658,7 +658,8 @@ function EditModal({ id, onClose, onSaved }) {
         swimStyle: form.swimStyle,
         isGuaranteed: form.isGuaranteed,
         totalQuota: form.totalQuota ? Number(form.totalQuota) : undefined,
-        expireDate: form.expireDate || undefined
+        expireDate: form.expireDate || undefined,
+        status: form.status
       }
       await updateEnrollment(id, body)
       toast.success('Cập nhật khóa học thành công')
@@ -671,7 +672,7 @@ function EditModal({ id, onClose, onSaved }) {
   }
 
   return (
-    <Modal open onClose={onClose} title="Sửa khóa học" size="lg">
+    <Modal open onClose={onClose} title="Sửa khóa học & Trạng thái" size="lg">
       {loadingDetail ? (
         <Spinner className="py-10" />
       ) : (
@@ -681,6 +682,18 @@ function EditModal({ id, onClose, onSaved }) {
             <p className="font-semibold text-ink-800 text-base">{detail?.studentName} ({detail?.studentPhone || '—'})</p>
             <p className="text-xs text-ink-500 mt-1">Giáo viên hiện tại: {(detail?.teacherNames || []).join(', ') || 'Chưa có'}</p>
           </div>
+
+          <Field label="Trạng thái khóa học" required hint="Admin có thể mở lại khóa học nếu bị giáo viên ấn nhầm đóng">
+            <select
+              value={form.status}
+              onChange={e => setForm({ ...form, status: e.target.value })}
+              className={inputCls + (form.status === 'ACTIVE' ? ' font-semibold text-emerald-700 bg-emerald-50/50 border-emerald-300' : form.status === 'COMPLETED' ? ' font-semibold text-blue-700 bg-blue-50/50 border-blue-300' : ' font-semibold text-ink-600 bg-ink-50/50')}
+            >
+              <option value="ACTIVE">🟢 Đang học (ACTIVE - Mở lại khóa)</option>
+              <option value="COMPLETED">🔵 Hoàn thành (COMPLETED - Đã học xong)</option>
+              <option value="EXPIRED">⚪ Hết hạn (EXPIRED)</option>
+            </select>
+          </Field>
 
           <Field label="Giáo viên phụ trách" hint="Thêm hoặc bớt giáo viên phụ trách khóa học này">
             {selectedTeachers.length > 0 && (

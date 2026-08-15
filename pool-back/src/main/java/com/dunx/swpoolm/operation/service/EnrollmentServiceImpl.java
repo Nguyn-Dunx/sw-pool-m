@@ -108,10 +108,17 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Common.NOT_FOUND));
 
-        // Không cho sửa enrollment đã COMPLETED hoặc EXPIRED
-        if (enrollment.getStatus() == EnrollmentStatus.COMPLETED
-                || enrollment.getStatus() == EnrollmentStatus.EXPIRED) {
-            throw new AppException(MessageKeys.Enrollment.CANNOT_UPDATE_FINISHED);
+        // Cập nhật trạng thái khóa học (Admin có quyền mở lại khóa học hoặc thay đổi trạng thái)
+        if (request.getStatus() != null && request.getStatus() != enrollment.getStatus()) {
+            if (request.getStatus() == EnrollmentStatus.ACTIVE) {
+                SwimStyle targetStyle = request.getSwimStyle() != null ? request.getSwimStyle() : enrollment.getSwimStyle();
+                boolean isDuplicate = enrollmentRepository.existsByStudentIdAndSwimStyleAndStatus(
+                        enrollment.getStudent().getId(), targetStyle, EnrollmentStatus.ACTIVE);
+                if (isDuplicate) {
+                    throw new AppException(MessageKeys.Enrollment.DUPLICATE_ACTIVE_STYLE);
+                }
+            }
+            enrollment.setStatus(request.getStatus());
         }
 
         // Cập nhật danh sách giáo viên
@@ -127,10 +134,12 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
         // Cập nhật kiểu bơi (kiểm tra trùng nếu thay đổi)
         if (request.getSwimStyle() != null && request.getSwimStyle() != enrollment.getSwimStyle()) {
-            boolean isDuplicate = enrollmentRepository.existsByStudentIdAndSwimStyleAndStatus(
-                    enrollment.getStudent().getId(), request.getSwimStyle(), EnrollmentStatus.ACTIVE);
-            if (isDuplicate) {
-                throw new AppException(MessageKeys.Enrollment.DUPLICATE_ACTIVE_STYLE);
+            if (enrollment.getStatus() == EnrollmentStatus.ACTIVE) {
+                boolean isDuplicate = enrollmentRepository.existsByStudentIdAndSwimStyleAndStatus(
+                        enrollment.getStudent().getId(), request.getSwimStyle(), EnrollmentStatus.ACTIVE);
+                if (isDuplicate) {
+                    throw new AppException(MessageKeys.Enrollment.DUPLICATE_ACTIVE_STYLE);
+                }
             }
             enrollment.setSwimStyle(request.getSwimStyle());
         }
@@ -149,7 +158,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         }
 
         Enrollment savedEnrollment = enrollmentRepository.save(enrollment);
-        log.info("Khóa học của {} đã được cập nhật", savedEnrollment.getStudent().getFullName());
+        log.info("Khóa học của {} đã được cập nhật (Trạng thái: {})", savedEnrollment.getStudent().getFullName(), savedEnrollment.getStatus());
 
         return mapToResponse(savedEnrollment, savedEnrollment.getStudent().getFullName(),
                 savedEnrollment.getTeachers().stream().map(Teacher::getFullName).toList());

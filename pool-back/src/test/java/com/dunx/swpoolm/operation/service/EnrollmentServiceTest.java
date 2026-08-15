@@ -230,18 +230,38 @@ class EnrollmentServiceTest {
         }
 
         @Test
-        @DisplayName("Không được cập nhật khóa học đã COMPLETED hoặc EXPIRED")
-        void updateEnrollment_finished_throwsAppException() {
+        @DisplayName("Admin có thể cập nhật trạng thái mở lại khóa học từ COMPLETED sang ACTIVE")
+        void updateEnrollment_reopenCompleted_success() {
             UUID enrollmentId = UUID.randomUUID();
+            UUID teacherId = UUID.randomUUID();
+
+            Student student = createStudent(UUID.randomUUID(), "Student X");
+            Teacher teacher = createTeacher(teacherId, "Teacher Y");
+
             Enrollment finished = Enrollment.builder()
+                    .student(student)
                     .status(EnrollmentStatus.COMPLETED)
+                    .swimStyle(SwimStyle.FROG)
+                    .isGuaranteed(false)
+                    .totalQuota(12)
+                    .startDate(LocalDate.of(2026, 1, 1))
+                    .expireDate(LocalDate.of(2026, 2, 15))
+                    .teachers(new HashSet<>(List.of(teacher)))
                     .build();
             finished.setId(enrollmentId);
 
-            when(enrollmentRepository.findById(enrollmentId)).thenReturn(Optional.of(finished));
+            EnrollmentUpdateRequest request = new EnrollmentUpdateRequest();
+            request.setStatus(EnrollmentStatus.ACTIVE);
 
-            AppException ex = assertThrows(AppException.class, () -> enrollmentService.updateEnrollment(enrollmentId, new EnrollmentUpdateRequest()));
-            assertThat(ex.getMessageKey()).isEqualTo(MessageKeys.Enrollment.CANNOT_UPDATE_FINISHED);
+            when(enrollmentRepository.findById(enrollmentId)).thenReturn(Optional.of(finished));
+            when(enrollmentRepository.existsByStudentIdAndSwimStyleAndStatus(student.getId(), SwimStyle.FROG, EnrollmentStatus.ACTIVE))
+                    .thenReturn(false);
+            when(enrollmentRepository.save(any(Enrollment.class))).thenAnswer(i -> i.getArgument(0));
+
+            EnrollmentResponse response = enrollmentService.updateEnrollment(enrollmentId, request);
+
+            assertThat(response).isNotNull();
+            assertThat(response.getStatus()).isEqualTo(EnrollmentStatus.ACTIVE);
         }
     }
 

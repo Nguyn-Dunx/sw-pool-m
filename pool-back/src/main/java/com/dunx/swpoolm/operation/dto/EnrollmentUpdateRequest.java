@@ -1,5 +1,6 @@
 package com.dunx.swpoolm.operation.dto;
 
+import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import jakarta.validation.constraints.Min;
 import lombok.Data;
@@ -21,4 +22,7 @@ public class EnrollmentUpdateRequest {
 
     @Min(value = 1, message = "{validation.min}")
     private Integer totalQuota;
+
+    private EnrollmentStatus status;
 }
+
