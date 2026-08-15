@@ -77,14 +77,20 @@ export function EmptyState({ icon: Icon, title, description, action }) {
   )
 }
 
-// ===== Modal =====
 export function Modal({ open, onClose, title, children, size = 'md' }) {
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden'
-      return () => { document.body.style.overflow = '' }
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') onClose?.()
+      }
+      window.addEventListener('keydown', handleKeyDown)
+      return () => {
+        document.body.style.overflow = ''
+        window.removeEventListener('keydown', handleKeyDown)
+      }
     }
-  }, [open])
+  }, [open, onClose])
 
   if (!open) return null
   const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }

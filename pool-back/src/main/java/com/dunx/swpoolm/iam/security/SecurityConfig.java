@@ -74,6 +74,12 @@ public class SecurityConfig {
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfTokenRepository.setCookieName(securityProperties.getCsrfCookieName());
         csrfTokenRepository.setHeaderName(securityProperties.getCsrfHeaderName());
+        csrfTokenRepository.setCookieCustomizer(cookie -> {
+            String sameSite = System.getenv("COOKIE_SAME_SITE");
+            if ("none".equalsIgnoreCase(sameSite)) {
+                cookie.sameSite("None").secure(true);
+            }
+        });
 
         http.csrf(csrf -> csrf
                 .csrfTokenRepository(csrfTokenRepository)
@@ -92,7 +98,7 @@ public class SecurityConfig {
                         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
                         "font-src 'self' https://fonts.gstatic.com data:; " +
                         "img-src 'self' data: blob:; " +
-                        "connect-src 'self' http://localhost:8080 ws://localhost:5173; "
+                        "connect-src 'self' https: http: ws:; "
                 ))
         );
 

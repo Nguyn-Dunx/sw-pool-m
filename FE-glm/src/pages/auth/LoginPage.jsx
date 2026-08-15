@@ -65,6 +65,7 @@ export default function LoginPage() {
                   placeholder="0xxx xxx xxx"
                   required
                   autoFocus
+                  autoComplete="username"
                 />
               </div>
             </Field>
@@ -79,6 +80,7 @@ export default function LoginPage() {
                   className={inputCls + ' pl-10 pr-10'}
                   placeholder="••••••••"
                   required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
