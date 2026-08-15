@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:match*",
-      "destination": "https://YOUR_BACKEND_APP.onrender.com/api/:match*"
+      "destination": "https://pool-back-yi85.onrender.com/api/:match*"
     },
     {
       "source": "/(.*)",
