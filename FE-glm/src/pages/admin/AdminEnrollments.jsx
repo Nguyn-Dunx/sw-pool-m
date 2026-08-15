@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { GraduationCap, Plus, Search, Eye, CheckCircle, Pencil, X, Shield, Users } from 'lucide-react'
 import { getEnrollments, getEnrollmentDetail, createEnrollment, updateEnrollment, completeEnrollment, getStudents, getTeachers } from '../../lib/apiAdmin'
-import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls } from '../../components/ui'
+import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
@@ -19,6 +19,7 @@ export default function AdminEnrollments() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState(searchParams.get('status') || '')
   const [swimStyle, setSwimStyle] = useState('')
+  const [isGuaranteed, setIsGuaranteed] = useState('')
   const [page, setPage] = useState(1)
   const [detail, setDetail] = useState(null)
   const [editingId, setEditingId] = useState(null)
@@ -39,65 +40,129 @@ export default function AdminEnrollments() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { setPage(1) }, [debouncedSearch, status, swimStyle])
+  useEffect(() => { setPage(1) }, [debouncedSearch, status, swimStyle, isGuaranteed])
   useEffect(() => { load() }, [debouncedSearch, status, swimStyle, page])
+
+  const filteredContent = list.content.filter((e) => {
+    if (isGuaranteed === 'true' && !e.isGuaranteed) return false
+    if (isGuaranteed === 'false' && e.isGuaranteed) return false
+    return true
+  })
+
+  const hasAnyFilter = Boolean(search || status || swimStyle || isGuaranteed !== '')
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Khóa học</h1>
-          <p className="text-sm text-ink-500 mt-1">Quản lý đăng ký khóa học bơi</p>
+          <p className="text-sm text-ink-500 mt-1">Quản lý đăng ký khóa học bơi — Lọc trực tiếp trên từng cột</p>
         </div>
         <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" /> Tạo khóa học</Button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-ink-100/60 p-4 flex flex-wrap gap-3 animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
-          <input
-            placeholder="Tên học viên..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={inputCls + ' pl-10'}
-          />
-        </div>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputCls + ' w-auto'}>
-          <option value="">Tất cả trạng thái</option>
-          <option value="ACTIVE">Đang học</option>
-          <option value="COMPLETED">Hoàn thành</option>
-          <option value="EXPIRED">Hết hạn</option>
-        </select>
-        <select value={swimStyle} onChange={(e) => setSwimStyle(e.target.value)} className={inputCls + ' w-auto'}>
-          <option value="">Tất cả kiểu bơi</option>
-          {Object.entries(STYLE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-      </div>
+      {/* Thanh hiển thị các bộ lọc đang kích hoạt */}
+      <ActiveFilterChips
+        filters={[
+          { label: 'Học viên', value: search, onRemove: () => setSearch('') },
+          { label: 'Kiểu bơi', value: swimStyle, displayValue: STYLE[swimStyle] ? `Bơi ${STYLE[swimStyle]}` : swimStyle, onRemove: () => setSwimStyle('') },
+          { label: 'Cam kết', value: isGuaranteed, displayValue: isGuaranteed === 'true' ? 'Cam kết' : isGuaranteed === 'false' ? 'Thường' : '', onRemove: () => setIsGuaranteed('') },
+          { label: 'Trạng thái', value: status, displayValue: status === 'ACTIVE' ? 'Đang học' : status === 'COMPLETED' ? 'Hoàn thành' : status === 'EXPIRED' ? 'Hết hạn' : '', onRemove: () => setStatus('') },
+        ]}
+        onClearAll={() => {
+          setSearch('')
+          setSwimStyle('')
+          setIsGuaranteed('')
+          setStatus('')
+        }}
+      />
 
-      <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-        {loading ? <Spinner className="py-20" size={32} /> : list.content.length === 0 ? (
-          <EmptyState icon={GraduationCap} title="Chưa có khóa học" description="Tạo khóa học đầu tiên cho hệ thống." />
+      <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+        {loading ? <Spinner className="py-20" size={32} /> : filteredContent.length === 0 ? (
+          <EmptyState
+            icon={GraduationCap}
+            title={hasAnyFilter ? 'Không tìm thấy khóa học phù hợp' : 'Chưa có khóa học'}
+            description={hasAnyFilter ? 'Không có khóa học nào khớp với bộ lọc đã chọn.' : 'Tạo khóa học đầu tiên cho hệ thống.'}
+            action={hasAnyFilter ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setSearch('')
+                  setSwimStyle('')
+                  setIsGuaranteed('')
+                  setStatus('')
+                }}
+              >
+                Xóa tất cả bộ lọc
+              </Button>
+            ) : null}
+          />
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-ink-50/80 text-ink-500 text-left">
+                <thead className="bg-ink-50/80 text-ink-500 text-left border-b border-ink-100/60">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Học viên</th>
-                    <th className="px-4 py-3 font-semibold">Giáo viên</th>
-                    <th className="px-4 py-3 font-semibold">Kiểu bơi</th>
-                    <th className="px-4 py-3 font-semibold">Cam kết</th>
-                    <th className="px-4 py-3 font-semibold">Hạn</th>
-                    <th className="px-4 py-3 font-semibold">Trạng thái</th>
-                    <th className="px-4 py-3 font-semibold text-right">Thao tác</th>
+                    <th className="px-4 py-3">
+                      <ColumnHeaderFilter
+                        label="Học viên"
+                        type="search"
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Tìm tên học viên..."
+                      />
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-ink-600">Giáo viên</th>
+                    <th className="px-4 py-3">
+                      <ColumnHeaderFilter
+                        label="Kiểu bơi"
+                        type="select"
+                        value={swimStyle}
+                        onChange={setSwimStyle}
+                        options={[
+                          { value: 'FROG', label: 'Bơi ếch' },
+                          { value: 'FREE', label: 'Bơi sải' },
+                          { value: 'BACK', label: 'Bơi ngửa' },
+                          { value: 'FLY', label: 'Bơi bướm' },
+                        ]}
+                      />
+                    </th>
+                    <th className="px-4 py-3">
+                      <ColumnHeaderFilter
+                        label="Cam kết"
+                        type="select"
+                        value={isGuaranteed}
+                        onChange={setIsGuaranteed}
+                        options={[
+                          { value: 'true', label: 'Cam kết', badgeColor: 'amber' },
+                          { value: 'false', label: 'Thường', badgeColor: 'gray' },
+                        ]}
+                      />
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-ink-600">Hạn</th>
+                    <th className="px-4 py-3">
+                      <ColumnHeaderFilter
+                        label="Trạng thái"
+                        type="select"
+                        value={status}
+                        onChange={setStatus}
+                        options={[
+                          { value: 'ACTIVE', label: 'Đang học', badgeColor: 'green' },
+                          { value: 'COMPLETED', label: 'Hoàn thành', badgeColor: 'blue' },
+                          { value: 'EXPIRED', label: 'Hết hạn', badgeColor: 'gray' },
+                        ]}
+                      />
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-ink-600 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100/60">
-                  {list.content.map((e) => (
+                  {filteredContent.map((e) => (
                     <tr key={e.id} className="hover:bg-pool-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-ink-800">{e.studentName}</td>
                       <td className="px-4 py-3 text-ink-600">{(e.teacherNames || []).join(', ') || '—'}</td>
-                      <td className="px-4 py-3 text-ink-600">{STYLE[e.swimStyle] || e.swimStyle}</td>
+                      <td className="px-4 py-3 text-ink-600 font-medium">Bơi {STYLE[e.swimStyle] || e.swimStyle}</td>
                       <td className="px-4 py-3">{e.isGuaranteed ? <Badge color="amber"><Shield className="w-3 h-3" /> Cam kết</Badge> : <Badge color="gray">Thường</Badge>}</td>
                       <td className="px-4 py-3 text-ink-600">{e.expireDate || '—'}</td>
                       <td className="px-4 py-3"><Badge color={STATUS[e.status]}>{e.status === 'ACTIVE' ? 'Đang học' : e.status === 'COMPLETED' ? 'Hoàn thành' : 'Hết hạn'}</Badge></td>
@@ -119,7 +184,7 @@ export default function AdminEnrollments() {
               </table>
             </div>
             <div className="p-4 border-t border-ink-100/60">
-              <p className="text-xs text-ink-400 mb-3">Tổng {list.totalElements} khóa học</p>
+              <p className="text-xs text-ink-400 mb-3">Tổng {filteredContent.length} khóa học</p>
               <Pagination page={list.currentPage} totalPages={list.totalPages} onChange={setPage} />
             </div>
           </>

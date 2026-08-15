@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { UserCircle, Plus, Search, Pencil, Trash2 } from 'lucide-react'
 import { getTeachers, createTeacher, updateTeacher, deleteTeacher } from '../../lib/apiAdmin'
-import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls } from '../../components/ui'
+import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
@@ -10,6 +10,7 @@ export default function AdminTeachers() {
   const [list, setList] = useState({ content: [], totalElements: 0, totalPages: 0, currentPage: 1, pageSize: 10 })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
   const [editing, setEditing] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -24,8 +25,15 @@ export default function AdminTeachers() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { setPage(1) }, [debouncedSearch])
+  useEffect(() => { setPage(1) }, [debouncedSearch, status])
   useEffect(() => { load() }, [debouncedSearch, page])
+
+  const filteredContent = list.content.filter((t) => {
+    if (status && t.status !== status) return false
+    return true
+  })
+
+  const hasAnyFilter = Boolean(search || status)
 
   const handleDelete = async (id, name) => {
     if (!confirm(`Xóa giáo viên "${name}"?`)) return
@@ -41,41 +49,69 @@ export default function AdminTeachers() {
       <div className="flex items-center justify-between flex-wrap gap-3 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Giáo viên</h1>
-          <p className="text-sm text-ink-500 mt-1">Quản lý danh sách giáo viên</p>
+          <p className="text-sm text-ink-500 mt-1">Quản lý danh sách giáo viên — Lọc trực tiếp trên từng cột</p>
         </div>
         <Button onClick={() => { setEditing(null); setShowForm(true) }}><Plus className="w-4 h-4" /> Thêm giáo viên</Button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-ink-100/60 p-4 animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
-          <input
-            placeholder="Tìm theo tên hoặc SĐT..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={inputCls + ' pl-10'}
-          />
-        </div>
-      </div>
+      {/* Thanh hiển thị các bộ lọc đang kích hoạt */}
+      <ActiveFilterChips
+        filters={[
+          { label: 'Họ tên / SĐT', value: search, onRemove: () => setSearch('') },
+          { label: 'Trạng thái', value: status, displayValue: status === 'ACTIVE' ? 'Hoạt động' : status === 'INACTIVE' ? 'Ngừng hoạt động' : '', onRemove: () => setStatus('') },
+        ]}
+        onClearAll={() => {
+          setSearch('')
+          setStatus('')
+        }}
+      />
 
-      <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-        {loading ? <Spinner className="py-20" size={32} /> : list.content.length === 0 ? (
-          <EmptyState icon={UserCircle} title="Chưa có giáo viên" description="Thêm giáo viên đầu tiên cho hệ thống." />
+      <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+        {loading ? <Spinner className="py-20" size={32} /> : filteredContent.length === 0 ? (
+          <EmptyState
+            icon={UserCircle}
+            title={hasAnyFilter ? 'Không tìm thấy giáo viên phù hợp' : 'Chưa có giáo viên'}
+            description={hasAnyFilter ? 'Không có giáo viên nào khớp với bộ lọc đã chọn.' : 'Thêm giáo viên đầu tiên cho hệ thống.'}
+            action={hasAnyFilter ? (
+              <Button variant="secondary" size="sm" onClick={() => { setSearch(''); setStatus('') }}>
+                Xóa tất cả bộ lọc
+              </Button>
+            ) : null}
+          />
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-ink-50/80 text-ink-500 text-left">
+                <thead className="bg-ink-50/80 text-ink-500 text-left border-b border-ink-100/60">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Họ tên</th>
-                    <th className="px-4 py-3 font-semibold">SĐT</th>
-                    <th className="px-4 py-3 font-semibold hidden sm:table-cell">Chuyên môn</th>
-                    <th className="px-4 py-3 font-semibold">Trạng thái</th>
-                    <th className="px-4 py-3 font-semibold text-right">Thao tác</th>
+                    <th className="px-4 py-3">
+                      <ColumnHeaderFilter
+                        label="Họ tên"
+                        type="search"
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Tìm tên hoặc SĐT..."
+                      />
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-ink-600">SĐT</th>
+                    <th className="px-4 py-3 font-semibold text-ink-600 hidden sm:table-cell">Chuyên môn</th>
+                    <th className="px-4 py-3">
+                      <ColumnHeaderFilter
+                        label="Trạng thái"
+                        type="select"
+                        value={status}
+                        onChange={setStatus}
+                        options={[
+                          { value: 'ACTIVE', label: 'Hoạt động', badgeColor: 'green' },
+                          { value: 'INACTIVE', label: 'Ngừng hoạt động', badgeColor: 'gray' },
+                        ]}
+                      />
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-ink-600 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100/60">
-                  {list.content.map((t) => (
+                  {filteredContent.map((t) => (
                     <tr key={t.id} className="hover:bg-pool-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-ink-800">{t.fullName}</td>
                       <td className="px-4 py-3 text-ink-600">{t.phoneNumber}</td>
@@ -97,7 +133,7 @@ export default function AdminTeachers() {
               </table>
             </div>
             <div className="p-4 border-t border-ink-100/60">
-              <p className="text-xs text-ink-400 mb-3">Tổng {list.totalElements} giáo viên</p>
+              <p className="text-xs text-ink-400 mb-3">Tổng {filteredContent.length} giáo viên</p>
               <Pagination page={list.currentPage} totalPages={list.totalPages} onChange={setPage} />
             </div>
           </>
