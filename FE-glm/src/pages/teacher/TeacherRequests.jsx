@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ListChecks, Plus, Search, UserPlus, Users, Shield, Info, Eye } from 'lucide-react'
+import { ListChecks, Plus, Search, UserPlus, Users, Shield, Info, Eye, CheckCircle } from 'lucide-react'
 import { getMyEnrollmentRequests, createEnrollmentRequest, getTeacherStudents, createTeacherStudent, getMyStudents } from '../../lib/apiTeacher'
 import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
+import { useAuth } from '../../store/auth'
+import { useRequestNotification } from '../../store/notifications'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
@@ -15,6 +17,8 @@ const TYPE_LABEL = { CREATE: 'Tạo mới', UPDATE: 'Cập nhật' }
 const STATUS_EN = { ACTIVE: 'Đang học', COMPLETED: 'Hoàn thành', EXPIRED: 'Hết hạn' }
 
 export default function TeacherRequests() {
+  const { user } = useAuth()
+  const { isRequestUnseen, markSingleRequestSeen, markAllTeacherRequestsSeen, teacherNewResponseCount } = useRequestNotification()
   const [list, setList] = useState({ content: [], totalElements: 0, totalPages: 0, currentPage: 1, pageSize: 10 })
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
@@ -26,7 +30,9 @@ export default function TeacherRequests() {
   const load = () => {
     setLoading(true)
     getMyEnrollmentRequests({ requestType: requestType || undefined, status: status || undefined, page, size: 10 })
-      .then(setList)
+      .then((res) => {
+        setList(res)
+      })
       .catch((e) => toast.error(errMsg(e)))
       .finally(() => setLoading(false))
   }
@@ -48,7 +54,20 @@ export default function TeacherRequests() {
           <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Yêu cầu đăng ký</h1>
           <p className="text-sm text-ink-500 mt-1">Gửi yêu cầu tạo/cập nhật khóa học cho Admin duyệt — Lọc trực tiếp trên từng cột</p>
         </div>
-        <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" /> Tạo yêu cầu</Button>
+        <div className="flex items-center gap-2">
+          {teacherNewResponseCount > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => markAllTeacherRequestsSeen(user?.id, list.content)}
+              title="Đánh dấu tất cả phản hồi hiện tại là đã xem"
+            >
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
+              Đánh dấu đã xem tất cả ({teacherNewResponseCount})
+            </Button>
+          )}
+          <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" /> Tạo yêu cầu</Button>
+        </div>
       </div>
 
       {/* Thanh hiển thị các bộ lọc đang kích hoạt */}
@@ -114,21 +133,57 @@ export default function TeacherRequests() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100/60">
-                  {filteredContent.map((r) => (
-                    <tr key={r.id} className="hover:bg-pool-50/50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-ink-800">{r.studentName || '—'}</td>
-                      <td className="px-4 py-3 text-ink-600 hidden sm:table-cell font-medium">Bơi {STYLE[r.swimStyle] || '—'}</td>
-                      <td className="px-4 py-3 hidden md:table-cell"><Badge color={r.requestType === 'CREATE' ? 'blue' : 'purple'}>{TYPE_LABEL[r.requestType] || r.requestType}</Badge></td>
-                      <td className="px-4 py-3"><Badge color={STATUS_COLOR[r.status]}>{STATUS_LABEL[r.status]}</Badge></td>
-                      <td className="px-4 py-3 text-ink-500 hidden md:table-cell max-w-[200px] truncate">{r.adminNote || '—'}</td>
-                      <td className="px-4 py-3 text-ink-500 hidden sm:table-cell">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '—'}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button onClick={() => setDetail(r)} className="p-1.5 rounded-lg text-pool-600 hover:bg-pool-50 transition-colors" title="Xem chi tiết">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredContent.map((r) => {
+                    const isUnseen = isRequestUnseen(user?.id, r)
+
+                    return (
+                      <tr
+                        key={r.id}
+                        className={`transition-colors ${
+                          isUnseen
+                            ? 'bg-rose-50/40 hover:bg-rose-50/70'
+                            : 'hover:bg-pool-50/50'
+                        }`}
+                      >
+                        <td className="px-4 py-3 font-medium text-ink-800">
+                          <div className="flex items-center gap-2">
+                            {isUnseen && (
+                              <span className="flex h-2.5 w-2.5 relative shrink-0" title="Phản hồi mới chưa xem">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                              </span>
+                            )}
+                            <span>{r.studentName || '—'}</span>
+                            {isUnseen && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 tracking-tight">
+                                Mới
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-ink-600 hidden sm:table-cell font-medium">Bơi {STYLE[r.swimStyle] || '—'}</td>
+                        <td className="px-4 py-3 hidden md:table-cell"><Badge color={r.requestType === 'CREATE' ? 'blue' : 'purple'}>{TYPE_LABEL[r.requestType] || r.requestType}</Badge></td>
+                        <td className="px-4 py-3"><Badge color={STATUS_COLOR[r.status]}>{STATUS_LABEL[r.status]}</Badge></td>
+                        <td className="px-4 py-3 text-ink-500 hidden md:table-cell max-w-[200px] truncate">{r.adminNote || '—'}</td>
+                        <td className="px-4 py-3 text-ink-500 hidden sm:table-cell">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '—'}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => {
+                              setDetail(r)
+                              markSingleRequestSeen(user?.id, r)
+                            }}
+                            className="relative p-1.5 rounded-lg text-pool-600 hover:bg-pool-50 transition-colors"
+                            title="Xem chi tiết (Xóa thông báo mới)"
+                          >
+                            <Eye className="w-4 h-4" />
+                            {isUnseen && (
+                              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

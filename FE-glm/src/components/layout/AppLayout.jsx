@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
-import { Menu, LogOut, ChevronDown } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Outlet, useNavigate, Link } from 'react-router-dom'
+import { Menu, LogOut, ChevronDown, Bell } from 'lucide-react'
 import Sidebar from './Sidebar'
 import { useAuth } from '../../store/auth'
+import { useRequestNotification } from '../../store/notifications'
 import { toast } from '../ui/Toast'
 
 export default function AppLayout({ role }) {
@@ -10,6 +11,19 @@ export default function AppLayout({ role }) {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { checkNotifications, adminPendingCount, teacherNewResponseCount } = useRequestNotification()
+
+  // Polling notifications định kỳ mỗi 15 giây
+  useEffect(() => {
+    if (!role) return
+    checkNotifications(role, user?.id)
+
+    const interval = setInterval(() => {
+      checkNotifications(role, user?.id)
+    }, 15000)
+
+    return () => clearInterval(interval)
+  }, [role, user?.id])
 
   const handleLogout = async () => {
     await logout()
@@ -32,6 +46,11 @@ export default function AppLayout({ role }) {
   }
 
   const initials = getInitials(user?.fullName, user?.phoneNumber)
+  const notificationCount = role === 'ADMIN' ? adminPendingCount : teacherNewResponseCount
+  const notificationLink = role === 'ADMIN' ? '/admin/enrollment-requests' : '/teacher/requests'
+  const notificationTooltip = role === 'ADMIN'
+    ? (adminPendingCount > 0 ? `Có ${adminPendingCount} yêu cầu mới chờ duyệt` : 'Không có yêu cầu chờ duyệt')
+    : (teacherNewResponseCount > 0 ? `Có ${teacherNewResponseCount} phản hồi yêu cầu mới` : 'Không có phản hồi mới')
 
   return (
     <div className="flex min-h-[100dvh] bg-gradient-to-br from-pool-50/50 via-white to-pool-50/30">
@@ -62,21 +81,40 @@ export default function AppLayout({ role }) {
             </div>
           </div>
 
-          {/* User menu */}
-          <div className="relative">
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2.5 py-1 px-2 rounded-xl hover:bg-ink-50 transition-colors"
+          {/* Right Header Actions */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Notification Bell with Red Dot / Counter */}
+            <Link
+              to={notificationLink}
+              title={notificationTooltip}
+              className="relative p-2 rounded-xl text-ink-600 hover:bg-ink-50 hover:text-ink-900 active:bg-ink-100 transition-colors"
             >
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-pool-500 to-pool-700 flex items-center justify-center text-white font-bold text-sm shadow-sm shadow-pool-200">
-                {initials}
-              </div>
-              <div className="hidden sm:block text-left">
-                <p className="text-sm font-semibold text-ink-800 leading-tight line-clamp-1 max-w-[160px]">{displayName}</p>
-                <p className="text-[11px] text-ink-400 leading-tight">{role === 'ADMIN' ? 'Quản trị viên' : (user?.phoneNumber || 'Giáo viên')}</p>
-              </div>
-              <ChevronDown className={`w-4 h-4 text-ink-400 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} />
-            </button>
+              <Bell className="w-5 h-5" />
+              {notificationCount > 0 && (
+                <>
+                  <span className="absolute top-1.5 right-1.5 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 border-2 border-white"></span>
+                  </span>
+                </>
+              )}
+            </Link>
+
+            {/* User menu */}
+            <div className="relative">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2.5 py-1 px-2 rounded-xl hover:bg-ink-50 transition-colors"
+              >
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-pool-500 to-pool-700 flex items-center justify-center text-white font-bold text-sm shadow-sm shadow-pool-200">
+                  {initials}
+                </div>
+                <div className="hidden sm:block text-left">
+                  <p className="text-sm font-semibold text-ink-800 leading-tight line-clamp-1 max-w-[160px]">{displayName}</p>
+                  <p className="text-[11px] text-ink-400 leading-tight">{role === 'ADMIN' ? 'Quản trị viên' : (user?.phoneNumber || 'Giáo viên')}</p>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-ink-400 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} />
+              </button>
 
             {/* Dropdown */}
             {showUserMenu && (
@@ -100,6 +138,7 @@ export default function AppLayout({ role }) {
                 </div>
               </>
             )}
+            </div>
           </div>
         </header>
 

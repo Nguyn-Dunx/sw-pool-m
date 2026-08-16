@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { ClipboardCheck, CheckCircle, XCircle, Eye, Search, Shield, X, User } from 'lucide-react'
 import { getEnrollmentRequests, reviewEnrollmentRequest, getTeachers, getEnrollmentDetail } from '../../lib/apiAdmin'
 import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
+import { useAuth } from '../../store/auth'
+import { useRequestNotification } from '../../store/notifications'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
@@ -14,6 +16,8 @@ const STATUS_LABEL = { PENDING: 'Chờ duyệt', APPROVED: 'Đã duyệt', REJEC
 const TYPE_LABEL = { CREATE: 'Tạo mới', UPDATE: 'Cập nhật' }
 
 export default function AdminEnrollmentRequests() {
+  const { user } = useAuth()
+  const { checkNotifications } = useRequestNotification()
   const [list, setList] = useState({ content: [], totalElements: 0, totalPages: 0, currentPage: 1, pageSize: 10 })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -27,7 +31,10 @@ export default function AdminEnrollmentRequests() {
   const load = () => {
     setLoading(true)
     getEnrollmentRequests({ status: status || undefined, requestType: requestType || undefined, page, size: 10 })
-      .then(setList)
+      .then((res) => {
+        setList(res)
+        checkNotifications('ADMIN', user?.id)
+      })
       .catch((e) => toast.error(errMsg(e)))
       .finally(() => setLoading(false))
   }
