@@ -14,7 +14,6 @@ import com.dunx.swpoolm.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -63,9 +62,9 @@ public class StudentServiceImpl implements StudentService {
     }
 
     @Override
-    public PageResponse<StudentResponse> getStudents(String keyword, int page, int size) {
+    public PageResponse<StudentResponse> getStudents(String keyword, SourceType sourceType, int page, int size) {
         Pageable pageable = PageRequestValidator.validate(page, size, Sort.by("createdAt").descending());
-        Page<Student> studentPage = studentRepository.searchStudents(keyword, pageable);
+        Page<Student> studentPage = studentRepository.searchStudents(keyword, sourceType, pageable);
 
         List<StudentResponse> responses = studentPage.getContent().stream()
                 .map(this::mapToResponse)

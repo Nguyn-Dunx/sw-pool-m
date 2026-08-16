@@ -33,13 +33,14 @@ public class EnrollmentAdminController {
     public ResponseEntity<ApiResponse<PageResponse<EnrollmentResponse>>> getEnrollments(
             @RequestParam(required = false) EnrollmentStatus status,
             @RequestParam(required = false) SwimStyle swimStyle,
+            @RequestParam(required = false) Boolean isGuaranteed,
             @RequestParam(required = false) String studentName,
             @RequestParam(required = false) UUID teacherId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         PageResponse<EnrollmentResponse> response = enrollmentService.getEnrollments(
-                status, swimStyle, studentName, teacherId, page, size);
+                status, swimStyle, isGuaranteed, studentName, teacherId, page, size);
 
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }

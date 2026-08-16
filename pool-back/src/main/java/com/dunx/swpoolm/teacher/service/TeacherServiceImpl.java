@@ -81,10 +81,10 @@ public class TeacherServiceImpl implements TeacherService {
     }
 
     @Override
-    public PageResponse<TeacherResponse> getTeachers(String keyword, int page, int size) {
+    public PageResponse<TeacherResponse> getTeachers(String keyword, TeacherStatus status, int page, int size) {
         Pageable pageable = PageRequestValidator.validate(page, size, Sort.by("createdAt").descending());
 
-        Page<Teacher> teacherPage = teacherRepository.searchTeachers(keyword, pageable);
+        Page<Teacher> teacherPage = teacherRepository.searchTeachers(keyword, status, pageable);
 
         List<TeacherResponse> responses = teacherPage.getContent().stream()
                 .map(this::mapToResponse)

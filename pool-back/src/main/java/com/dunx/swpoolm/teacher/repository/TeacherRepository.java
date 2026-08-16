@@ -19,7 +19,12 @@ public interface TeacherRepository extends JpaRepository<Teacher, UUID> {
     long countByStatus(com.dunx.swpoolm.teacher.enums.TeacherStatus status);
 
     @Query("SELECT t FROM Teacher t JOIN t.user u WHERE " +
-            "(LOWER(t.fullName) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%')) " +
-            "OR u.phoneNumber LIKE CONCAT('%', COALESCE(:keyword, ''), '%'))")
-    Page<Teacher> searchTeachers(@Param("keyword") String keyword, Pageable pageable);
+            "(:status IS NULL OR t.status = :status) AND (" +
+            "LOWER(t.fullName) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%')) " +
+            "OR u.phoneNumber LIKE CONCAT('%', COALESCE(:keyword, ''), '%')) " +
+            "ORDER BY t.createdAt DESC")
+    Page<Teacher> searchTeachers(
+            @Param("keyword") String keyword,
+            @Param("status") com.dunx.swpoolm.teacher.enums.TeacherStatus status,
+            Pageable pageable);
 }

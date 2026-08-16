@@ -28,9 +28,19 @@ export default function AdminEnrollmentRequests() {
   const [page, setPage] = useState(1)
   const [review, setReview] = useState(null)
 
+  const debouncedSearch = useDebounce(search, 300)
+
   const load = () => {
     setLoading(true)
-    getEnrollmentRequests({ status: status || undefined, requestType: requestType || undefined, page, size: 10 })
+    getEnrollmentRequests({
+      status: status || undefined,
+      requestType: requestType || undefined,
+      swimStyle: swimStyle || undefined,
+      isGuaranteed: isGuaranteed === 'true' ? true : isGuaranteed === 'false' ? false : undefined,
+      search: debouncedSearch || undefined,
+      page,
+      size: 10
+    })
       .then((res) => {
         setList(res)
         checkNotifications('ADMIN', user?.id)
@@ -39,19 +49,10 @@ export default function AdminEnrollmentRequests() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { setPage(1) }, [status, requestType, search, swimStyle, isGuaranteed])
-  useEffect(() => { load() }, [status, requestType, page])
+  useEffect(() => { setPage(1) }, [status, requestType, debouncedSearch, swimStyle, isGuaranteed])
+  useEffect(() => { load() }, [status, requestType, debouncedSearch, swimStyle, isGuaranteed, page])
 
-  const filteredContent = list.content.filter((r) => {
-    if (search && !r.studentName?.toLowerCase().includes(search.toLowerCase())) return false
-    if (swimStyle && r.swimStyle !== swimStyle) return false
-    if (isGuaranteed === 'true' && !r.isGuaranteed) return false
-    if (isGuaranteed === 'false' && r.isGuaranteed) return false
-    if (status && r.status !== status) return false
-    if (requestType && r.requestType !== requestType) return false
-    return true
-  })
-
+  const requests = list.content || []
   const hasAnyFilter = Boolean(search || status || swimStyle || isGuaranteed !== '' || requestType)
 
   return (
@@ -80,7 +81,7 @@ export default function AdminEnrollmentRequests() {
       />
 
       <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-        {loading ? <Spinner className="py-20" size={32} /> : filteredContent.length === 0 ? (
+        {loading ? <Spinner className="py-20" size={32} /> : requests.length === 0 ? (
           <EmptyState
             icon={ClipboardCheck}
             title={hasAnyFilter ? 'Không tìm thấy yêu cầu phù hợp' : 'Không có yêu cầu'}
@@ -173,7 +174,7 @@ export default function AdminEnrollmentRequests() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100/60">
-                  {filteredContent.map((r) => (
+                  {requests.map((r) => (
                     <tr key={r.id} className="hover:bg-pool-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-ink-800">{r.studentName}</td>
                       <td className="px-4 py-3 text-ink-600">{r.teacherName || '—'}</td>
@@ -199,7 +200,7 @@ export default function AdminEnrollmentRequests() {
               </table>
             </div>
             <div className="p-4 border-t border-ink-100/60">
-              <p className="text-xs text-ink-400 mb-3">Tổng {filteredContent.length} yêu cầu</p>
+              <p className="text-xs text-ink-400 mb-3">Tổng {list.totalElements || 0} yêu cầu</p>
               <Pagination page={list.currentPage} totalPages={list.totalPages} onChange={setPage} />
             </div>
           </>

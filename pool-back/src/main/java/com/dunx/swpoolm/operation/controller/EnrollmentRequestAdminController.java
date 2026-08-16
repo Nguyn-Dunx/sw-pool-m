@@ -30,12 +30,14 @@ public class EnrollmentRequestAdminController {
     public ResponseEntity<ApiResponse<PageResponse<EnrollmentRequestResponse>>> getRequests(
             @RequestParam(required = false) RequestStatus status,
             @RequestParam(required = false) RequestType requestType,
+            @RequestParam(required = false) com.dunx.swpoolm.operation.enums.SwimStyle swimStyle,
+            @RequestParam(required = false) Boolean isGuaranteed,
+            @RequestParam(required = false) String searchName,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        RequestStatus filterStatus = (status != null) ? status : RequestStatus.PENDING;
-        PageResponse<EnrollmentRequestResponse> response = enrollmentRequestService.getRequestsByStatus(
-                filterStatus, requestType, page, size);
+        PageResponse<EnrollmentRequestResponse> response = enrollmentRequestService.getRequestsByAdminFilters(
+                status, requestType, swimStyle, isGuaranteed, searchName, page, size);
 
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }

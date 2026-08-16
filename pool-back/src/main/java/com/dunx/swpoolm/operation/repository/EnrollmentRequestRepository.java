@@ -17,20 +17,29 @@ import java.util.UUID;
 @Repository
 public interface EnrollmentRequestRepository extends JpaRepository<EnrollmentRequest, UUID> {
 
-    // Có thể filter theo requestType (nếu null thì lấy tất cả)
     @Query("SELECT r FROM EnrollmentRequest r WHERE " +
            "(:status IS NULL OR r.status = :status) AND " +
-           "(:requestType IS NULL OR r.requestType = :requestType)")
-    Page<EnrollmentRequest> findByStatusAndType(
+           "(:requestType IS NULL OR r.requestType = :requestType) AND " +
+           "(:swimStyle IS NULL OR r.swimStyle = :swimStyle) AND " +
+           "(:isGuaranteed IS NULL OR r.isGuaranteed = :isGuaranteed) AND " +
+           "LOWER(r.student.fullName) LIKE LOWER(CONCAT('%', COALESCE(:studentName, ''), '%')) " +
+           "ORDER BY r.createdAt DESC")
+    Page<EnrollmentRequest> findByAdminFilters(
             @Param("status") RequestStatus status,
             @Param("requestType") RequestType requestType,
+            @Param("swimStyle") SwimStyle swimStyle,
+            @Param("isGuaranteed") Boolean isGuaranteed,
+            @Param("studentName") String studentName,
             Pageable pageable);
 
     @Query("SELECT r FROM EnrollmentRequest r WHERE " +
            "r.teacher.id = :teacherId AND " +
-           "(:requestType IS NULL OR r.requestType = :requestType)")
-    Page<EnrollmentRequest> findByTeacherIdAndType(
+           "(:status IS NULL OR r.status = :status) AND " +
+           "(:requestType IS NULL OR r.requestType = :requestType) " +
+           "ORDER BY r.createdAt DESC")
+    Page<EnrollmentRequest> findByTeacherIdAndFilters(
             @Param("teacherId") UUID teacherId,
+            @Param("status") RequestStatus status,
             @Param("requestType") RequestType requestType,
             Pageable pageable);
 

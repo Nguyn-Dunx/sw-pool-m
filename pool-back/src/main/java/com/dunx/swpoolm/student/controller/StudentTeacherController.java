@@ -45,7 +45,7 @@ public class StudentTeacherController {
             @RequestParam(required = false, defaultValue = "1") int page,
             @RequestParam(required = false, defaultValue = "100") int size) {
 
-        PageResponse<StudentResponse> response = studentService.getStudents(keyword, page, size);
+        PageResponse<StudentResponse> response = studentService.getStudents(keyword, null, page, size);
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }
 }

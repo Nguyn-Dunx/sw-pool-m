@@ -39,9 +39,10 @@ public class StudentAdminController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PageResponse<StudentResponse>>> getStudents(
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) com.dunx.swpoolm.student.enums.SourceType sourceType,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
-        PageResponse<StudentResponse> response = studentService.getStudents(keyword, page, size);
+        PageResponse<StudentResponse> response = studentService.getStudents(keyword, sourceType, page, size);
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }
 

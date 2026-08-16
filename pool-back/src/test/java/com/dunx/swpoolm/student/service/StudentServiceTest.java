@@ -118,9 +118,9 @@ class StudentServiceTest {
             student.setId(UUID.randomUUID());
 
             Page<Student> page = new PageImpl<>(List.of(student));
-            when(studentRepository.searchStudents(anyString(), any(Pageable.class))).thenReturn(page);
+            when(studentRepository.searchStudents(anyString(), any(), any(Pageable.class))).thenReturn(page);
 
-            PageResponse<StudentResponse> response = studentService.getStudents("Le", 1, 10);
+            PageResponse<StudentResponse> response = studentService.getStudents("Le", null, 1, 10);
 
             assertThat(response).isNotNull();
             assertThat(response.getItems()).hasSize(1);

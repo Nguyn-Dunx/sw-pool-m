@@ -118,22 +118,30 @@ public class EnrollmentRequestServiceImpl implements EnrollmentRequestService {
     }
 
     @Override
-    public PageResponse<EnrollmentRequestResponse> getRequestsByTeacher(UUID userId, RequestType requestType, int page, int size) {
+    public PageResponse<EnrollmentRequestResponse> getRequestsByTeacher(UUID userId, RequestStatus status, RequestType requestType, int page, int size) {
         Teacher teacher = teacherRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
 
         Pageable pageable = PageRequestValidator.validate(page, size, Sort.by("createdAt").descending());
-        Page<EnrollmentRequest> requestPage = enrollmentRequestRepository.findByTeacherIdAndType(teacher.getId(), requestType, pageable);
+        Page<EnrollmentRequest> requestPage = enrollmentRequestRepository.findByTeacherIdAndFilters(teacher.getId(), status, requestType, pageable);
+
+        return buildPageResponse(requestPage, page, size);
+    }
+
+    @Override
+    public PageResponse<EnrollmentRequestResponse> getRequestsByAdminFilters(
+            RequestStatus status, RequestType requestType, com.dunx.swpoolm.operation.enums.SwimStyle swimStyle,
+            Boolean isGuaranteed, String studentName, int page, int size) {
+        Pageable pageable = PageRequestValidator.validate(page, size, Sort.by("createdAt").descending());
+        Page<EnrollmentRequest> requestPage = enrollmentRequestRepository.findByAdminFilters(
+                status, requestType, swimStyle, isGuaranteed, studentName, pageable);
 
         return buildPageResponse(requestPage, page, size);
     }
 
     @Override
     public PageResponse<EnrollmentRequestResponse> getRequestsByStatus(RequestStatus status, RequestType requestType, int page, int size) {
-        Pageable pageable = PageRequestValidator.validate(page, size, Sort.by("createdAt").descending());
-        Page<EnrollmentRequest> requestPage = enrollmentRequestRepository.findByStatusAndType(status, requestType, pageable);
-
-        return buildPageResponse(requestPage, page, size);
+        return getRequestsByAdminFilters(status, requestType, null, null, null, page, size);
     }
 
     @Override

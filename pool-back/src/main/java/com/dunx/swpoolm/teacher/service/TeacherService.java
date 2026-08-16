@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface TeacherService {
     TeacherResponse createTeacher(TeacherCreateRequest request);
-    PageResponse<TeacherResponse> getTeachers(String keyword, int page, int size);
+    PageResponse<TeacherResponse> getTeachers(String keyword, com.dunx.swpoolm.teacher.enums.TeacherStatus status, int page, int size);
     TeacherResponse updateTeacher(UUID id, TeacherUpdateRequest request);
     void deleteTeacher(UUID id);
 }

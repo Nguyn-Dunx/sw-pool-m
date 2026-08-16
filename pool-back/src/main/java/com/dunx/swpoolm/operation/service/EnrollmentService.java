@@ -12,7 +12,7 @@ public interface EnrollmentService {
     EnrollmentResponse updateEnrollment(UUID enrollmentId, EnrollmentUpdateRequest request);
     void completeEnrollment(UUID enrollmentId);
 
-    PageResponse<EnrollmentResponse> getEnrollments(EnrollmentStatus status, SwimStyle swimStyle,
-                                                     String studentName, UUID teacherId, int page, int size);
+    PageResponse<EnrollmentResponse> getEnrollments(EnrollmentStatus status, SwimStyle swimStyle, Boolean isGuaranteed,
+                                                    String studentName, UUID teacherId, int page, int size);
     EnrollmentDetailResponse getEnrollmentDetail(UUID enrollmentId);
 }

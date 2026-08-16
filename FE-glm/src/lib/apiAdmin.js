@@ -19,7 +19,7 @@ export const updateEnrollment = async (id, body) => unwrap(await api.put(`/admin
 export const completeEnrollment = async (id) => unwrap(await api.put(`/admin/enrollments/${id}/complete`))
 
 // ===== Enrollment Requests =====
-export const getEnrollmentRequests = async (params) => unwrapPage(await api.get('/admin/enrollment-requests' + qs(params)))
+export const getEnrollmentRequests = async (params) => unwrapPage(await api.get('/admin/enrollment-requests' + qs({ ...params, searchName: params.studentName || params.searchName || params.search || params.keyword })))
 export const reviewEnrollmentRequest = async (id, body) => unwrap(await api.put(`/admin/enrollment-requests/${id}/review`, body))
 
 // ===== Students =====

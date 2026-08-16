@@ -19,20 +19,16 @@ export default function AdminTeachers() {
 
   const load = () => {
     setLoading(true)
-    getTeachers({ teacherName: debouncedSearch, page, size: 10 })
+    getTeachers({ teacherName: debouncedSearch, status: status || undefined, page, size: 10 })
       .then(setList)
       .catch((e) => toast.error(errMsg(e)))
       .finally(() => setLoading(false))
   }
 
   useEffect(() => { setPage(1) }, [debouncedSearch, status])
-  useEffect(() => { load() }, [debouncedSearch, page])
+  useEffect(() => { load() }, [debouncedSearch, status, page])
 
-  const filteredContent = list.content.filter((t) => {
-    if (status && t.status !== status) return false
-    return true
-  })
-
+  const teachers = list.content || []
   const hasAnyFilter = Boolean(search || status)
 
   const handleDelete = async (id, name) => {
@@ -67,7 +63,7 @@ export default function AdminTeachers() {
       />
 
       <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-        {loading ? <Spinner className="py-20" size={32} /> : filteredContent.length === 0 ? (
+        {loading ? <Spinner className="py-20" size={32} /> : teachers.length === 0 ? (
           <EmptyState
             icon={UserCircle}
             title={hasAnyFilter ? 'Không tìm thấy giáo viên phù hợp' : 'Chưa có giáo viên'}
@@ -111,7 +107,7 @@ export default function AdminTeachers() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100/60">
-                  {filteredContent.map((t) => (
+                  {teachers.map((t) => (
                     <tr key={t.id} className="hover:bg-pool-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-ink-800">{t.fullName}</td>
                       <td className="px-4 py-3 text-ink-600">{t.phoneNumber}</td>
@@ -133,7 +129,7 @@ export default function AdminTeachers() {
               </table>
             </div>
             <div className="p-4 border-t border-ink-100/60">
-              <p className="text-xs text-ink-400 mb-3">Tổng {filteredContent.length} giáo viên</p>
+              <p className="text-xs text-ink-400 mb-3">Tổng {list.totalElements || 0} giáo viên</p>
               <Pagination page={list.currentPage} totalPages={list.totalPages} onChange={setPage} />
             </div>
           </>

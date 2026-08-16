@@ -43,6 +43,7 @@ public class EnrollmentRequestController {
     @GetMapping
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<ApiResponse<PageResponse<EnrollmentRequestResponse>>> getMyRequests(
+            @RequestParam(required = false) com.dunx.swpoolm.operation.enums.RequestStatus status,
             @RequestParam(required = false) RequestType requestType,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -50,7 +51,7 @@ public class EnrollmentRequestController {
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         PageResponse<EnrollmentRequestResponse> response = enrollmentRequestService.getRequestsByTeacher(
-                userDetails.getUser().getId(), requestType, page, size);
+                userDetails.getUser().getId(), status, requestType, page, size);
 
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }

@@ -40,11 +40,7 @@ export default function TeacherRequests() {
   useEffect(() => { setPage(1) }, [status, requestType])
   useEffect(() => { load() }, [status, requestType, page])
 
-  const filteredContent = list.content.filter((r) => {
-    if (status && r.status !== status) return false
-    return true
-  })
-
+  const requests = list.content || []
   const hasAnyFilter = Boolean(status || requestType)
 
   return (
@@ -83,7 +79,7 @@ export default function TeacherRequests() {
       />
 
       <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-        {loading ? <Spinner className="py-20" size={32} /> : filteredContent.length === 0 ? (
+        {loading ? <Spinner className="py-20" size={32} /> : requests.length === 0 ? (
           <EmptyState
             icon={ListChecks}
             title={hasAnyFilter ? 'Không tìm thấy yêu cầu phù hợp' : 'Chưa có yêu cầu'}
@@ -133,7 +129,7 @@ export default function TeacherRequests() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100/60">
-                  {filteredContent.map((r) => {
+                  {requests.map((r) => {
                     const isUnseen = isRequestUnseen(user?.id, r)
 
                     return (
@@ -188,7 +184,7 @@ export default function TeacherRequests() {
               </table>
             </div>
             <div className="p-4 border-t border-ink-100/60">
-              <p className="text-xs text-ink-400 mb-3">Tổng {filteredContent.length} yêu cầu</p>
+              <p className="text-xs text-ink-400 mb-3">Tổng {list.totalElements || 0} yêu cầu</p>
               <Pagination page={list.currentPage} totalPages={list.totalPages} onChange={setPage} />
             </div>
           </>

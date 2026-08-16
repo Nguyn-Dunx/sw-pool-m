@@ -43,10 +43,11 @@ public class TeacherAdminController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PageResponse<TeacherResponse>>> getTeachers(
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) com.dunx.swpoolm.teacher.enums.TeacherStatus status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        PageResponse<TeacherResponse> response = teacherService.getTeachers(keyword, page, size);
+        PageResponse<TeacherResponse> response = teacherService.getTeachers(keyword, status, page, size);
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }
 

@@ -13,7 +13,9 @@ public interface EnrollmentRequestService {
 
     EnrollmentRequestResponse createRequest(UUID userId, EnrollmentRequestCreateDTO request);
 
-    PageResponse<EnrollmentRequestResponse> getRequestsByTeacher(UUID userId, RequestType requestType, int page, int size);
+    PageResponse<EnrollmentRequestResponse> getRequestsByTeacher(UUID userId, RequestStatus status, RequestType requestType, int page, int size);
+
+    PageResponse<EnrollmentRequestResponse> getRequestsByAdminFilters(RequestStatus status, RequestType requestType, com.dunx.swpoolm.operation.enums.SwimStyle swimStyle, Boolean isGuaranteed, String studentName, int page, int size);
 
     PageResponse<EnrollmentRequestResponse> getRequestsByStatus(RequestStatus status, RequestType requestType, int page, int size);
 

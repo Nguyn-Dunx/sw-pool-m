@@ -110,12 +110,14 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     @Query("SELECT e FROM Enrollment e JOIN FETCH e.student " +
             "WHERE (:status IS NULL OR e.status = :status) " +
             "AND (:swimStyle IS NULL OR e.swimStyle = :swimStyle) " +
+            "AND (:isGuaranteed IS NULL OR e.isGuaranteed = :isGuaranteed) " +
             "AND LOWER(e.student.fullName) " +
                 "LIKE LOWER(CONCAT('%', COALESCE(:studentName, ''), '%')) " +
             "ORDER BY e.createdAt DESC")
     Page<Enrollment> findAllWithFilters(
             @Param("status") EnrollmentStatus status,
             @Param("swimStyle") SwimStyle swimStyle,
+            @Param("isGuaranteed") Boolean isGuaranteed,
             @Param("studentName") String studentName,
             Pageable pageable);
 

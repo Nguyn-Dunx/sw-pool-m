@@ -34,21 +34,23 @@ export default function AdminEnrollments() {
 
   const load = () => {
     setLoading(true)
-    getEnrollments({ studentName: debouncedSearch, status, swimStyle, page, size: 10 })
+    getEnrollments({
+      studentName: debouncedSearch,
+      status: status || undefined,
+      swimStyle: swimStyle || undefined,
+      isGuaranteed: isGuaranteed === 'true' ? true : isGuaranteed === 'false' ? false : undefined,
+      page,
+      size: 10
+    })
       .then(setList)
       .catch((e) => toast.error(errMsg(e)))
       .finally(() => setLoading(false))
   }
 
   useEffect(() => { setPage(1) }, [debouncedSearch, status, swimStyle, isGuaranteed])
-  useEffect(() => { load() }, [debouncedSearch, status, swimStyle, page])
+  useEffect(() => { load() }, [debouncedSearch, status, swimStyle, isGuaranteed, page])
 
-  const filteredContent = list.content.filter((e) => {
-    if (isGuaranteed === 'true' && !e.isGuaranteed) return false
-    if (isGuaranteed === 'false' && e.isGuaranteed) return false
-    return true
-  })
-
+  const enrollments = list.content || []
   const hasAnyFilter = Boolean(search || status || swimStyle || isGuaranteed !== '')
 
   return (
@@ -78,7 +80,7 @@ export default function AdminEnrollments() {
       />
 
       <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-        {loading ? <Spinner className="py-20" size={32} /> : filteredContent.length === 0 ? (
+        {loading ? <Spinner className="py-20" size={32} /> : enrollments.length === 0 ? (
           <EmptyState
             icon={GraduationCap}
             title={hasAnyFilter ? 'Không tìm thấy khóa học phù hợp' : 'Chưa có khóa học'}
@@ -158,7 +160,7 @@ export default function AdminEnrollments() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100/60">
-                  {filteredContent.map((e) => (
+                  {enrollments.map((e) => (
                     <tr key={e.id} className="hover:bg-pool-50/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-ink-800">{e.studentName}</td>
                       <td className="px-4 py-3 text-ink-600">{(e.teacherNames || []).join(', ') || '—'}</td>
@@ -182,7 +184,7 @@ export default function AdminEnrollments() {
               </table>
             </div>
             <div className="p-4 border-t border-ink-100/60">
-              <p className="text-xs text-ink-400 mb-3">Tổng {filteredContent.length} khóa học</p>
+              <p className="text-xs text-ink-400 mb-3">Tổng {list.totalElements || 0} khóa học</p>
               <Pagination page={list.currentPage} totalPages={list.totalPages} onChange={setPage} />
             </div>
           </>

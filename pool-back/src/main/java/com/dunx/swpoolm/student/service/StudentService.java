@@ -11,7 +11,7 @@ import java.util.UUID;
 public interface StudentService {
     StudentResponse createStudent(StudentCreateRequest request);
     StudentResponse createStudentByTeacher(TeacherStudentCreateRequest request);
-    PageResponse<StudentResponse> getStudents(String keyword, int page, int size);
+    PageResponse<StudentResponse> getStudents(String keyword, com.dunx.swpoolm.student.enums.SourceType sourceType, int page, int size);
     StudentResponse updateStudent(UUID id, StudentUpdateRequest request);
     void deleteStudent(UUID id);
 }

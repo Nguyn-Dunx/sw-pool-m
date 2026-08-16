@@ -183,7 +183,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<EnrollmentResponse> getEnrollments(EnrollmentStatus status, SwimStyle swimStyle,
+    public PageResponse<EnrollmentResponse> getEnrollments(EnrollmentStatus status, SwimStyle swimStyle, Boolean isGuaranteed,
                                                             String studentName, UUID teacherId, int page, int size) {
         Pageable pageable = PageRequestValidator.validate(page, size);
         Page<Enrollment> enrollmentPage;
@@ -193,7 +193,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             enrollmentPage = enrollmentRepository.findAllByTeacherWithFilters(teacherId, status, pageable);
         } else {
             // Filter tổng hợp
-            enrollmentPage = enrollmentRepository.findAllWithFilters(status, swimStyle, studentName, pageable);
+            enrollmentPage = enrollmentRepository.findAllWithFilters(status, swimStyle, isGuaranteed, studentName, pageable);
         }
 
         List<EnrollmentResponse> responses = enrollmentPage.getContent().stream()
