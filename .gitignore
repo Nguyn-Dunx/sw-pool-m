@@ -27,6 +27,8 @@ coverage/
 # =========================
 # Vite / Frontend Caches & Logs
 # =========================
+.vite/
+**/.vite/
 dist-ssr/
 *.local
 .eslintcache
