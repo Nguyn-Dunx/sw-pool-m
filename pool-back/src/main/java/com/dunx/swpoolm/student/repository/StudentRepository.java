@@ -24,4 +24,13 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
             @Param("keyword") String keyword,
             @Param("sourceType") com.dunx.swpoolm.student.enums.SourceType sourceType,
             Pageable pageable);
+
+    @Query("SELECT s FROM Student s WHERE " +
+            "(:sourceType IS NULL OR s.sourceType = :sourceType) AND (" +
+            "LOWER(s.fullName) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%')) " +
+            "OR s.phoneNumber LIKE CONCAT('%', COALESCE(:keyword, ''), '%')) " +
+            "ORDER BY s.createdAt DESC")
+    java.util.List<Student> exportStudents(
+            @Param("keyword") String keyword,
+            @Param("sourceType") com.dunx.swpoolm.student.enums.SourceType sourceType);
 }

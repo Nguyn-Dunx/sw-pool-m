@@ -23,7 +23,43 @@ import java.util.UUID;
 public class TeacherEnrollmentController {
 
     private final TeacherOperationService teacherOperationService;
+    private final com.dunx.swpoolm.operation.service.EnrollmentExcelService enrollmentExcelService;
     private final MessageService messageService;
+
+    @GetMapping("/export")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<byte[]> exportMyStudents(
+            @RequestParam(required = false) String searchName,
+            @RequestParam(required = false) com.dunx.swpoolm.operation.enums.SwimStyle swimStyle,
+            @RequestParam(required = false) com.dunx.swpoolm.operation.enums.EnrollmentStatus status,
+            @RequestParam(required = false) Boolean isGuaranteed,
+            Authentication authentication) throws java.io.IOException {
+
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        byte[] excelBytes = enrollmentExcelService.exportTeacherStudents(
+                userDetails.getUser().getId(), searchName, swimStyle, status, isGuaranteed);
+
+        String filename = "Hoc_Vien_Phu_Trach_" + java.time.LocalDate.now() + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelBytes);
+    }
+
+    @GetMapping("/{enrollmentId}/history/export")
+    @PreAuthorize("hasRole('TEACHER') or hasRole('ADMIN')")
+    public ResponseEntity<byte[]> exportStudentHistory(
+            @PathVariable UUID enrollmentId) throws java.io.IOException {
+
+        byte[] excelBytes = enrollmentExcelService.exportStudentHistory(enrollmentId);
+        String filename = "Lich_Su_Diem_Danh_" + java.time.LocalDate.now() + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelBytes);
+    }
 
     // 1. API Lấy danh sách Khóa học (Học viên) của Giáo viên (Có lọc đa chiều)
     @GetMapping

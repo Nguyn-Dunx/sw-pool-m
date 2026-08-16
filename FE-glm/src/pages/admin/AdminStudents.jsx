@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Users, Plus, Search, Pencil, Trash2 } from 'lucide-react'
-import { getStudents, createStudent, updateStudent, deleteStudent } from '../../lib/apiAdmin'
-import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
+import { getStudents, createStudent, updateStudent, deleteStudent, exportStudents } from '../../lib/apiAdmin'
+import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips, ExportButton } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
+import { downloadFile } from '../../lib/fileDownload'
+import { getTodayDate } from '../../lib/dateUtils'
 
 const SOURCE_LABEL = { POOL: 'Tự đến', TEACHER: 'GV giới thiệu' }
 const SOURCE_COLOR = { POOL: 'blue', TEACHER: 'purple' }
@@ -28,6 +30,14 @@ export default function AdminStudents() {
       .finally(() => setLoading(false))
   }
 
+  const handleExport = () => downloadFile(
+    () => exportStudents({
+      studentName: debouncedSearch,
+      sourceType: sourceType || undefined
+    }),
+    `Danh_Sach_Hoc_Vien_${getTodayDate()}.xlsx`
+  )
+
   useEffect(() => { setPage(1) }, [debouncedSearch, sourceType])
   useEffect(() => { load() }, [debouncedSearch, sourceType, page])
 
@@ -50,7 +60,10 @@ export default function AdminStudents() {
           <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Học viên</h1>
           <p className="text-sm text-ink-500 mt-1">Quản lý danh sách học viên — Lọc trực tiếp trên từng cột</p>
         </div>
-        <Button onClick={() => { setEditing(null); setShowForm(true) }}><Plus className="w-4 h-4" /> Thêm học viên</Button>
+        <div className="flex items-center gap-2">
+          <ExportButton onExport={handleExport} />
+          <Button onClick={() => { setEditing(null); setShowForm(true) }}><Plus className="w-4 h-4" /> Thêm học viên</Button>
+        </div>
       </div>
 
       {/* Thanh hiển thị các bộ lọc đang kích hoạt */}

@@ -23,7 +23,23 @@ import java.util.UUID;
 public class StudentAdminController {
 
     private final StudentService studentService;
+    private final com.dunx.swpoolm.student.service.StudentExcelService studentExcelService;
     private final MessageService messageService;
+
+    @GetMapping("/export")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> exportStudents(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) com.dunx.swpoolm.student.enums.SourceType sourceType) throws java.io.IOException {
+
+        byte[] excelBytes = studentExcelService.exportStudents(keyword, sourceType);
+        String filename = "Danh_Sach_Hoc_Vien_" + java.time.LocalDate.now() + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelBytes);
+    }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")

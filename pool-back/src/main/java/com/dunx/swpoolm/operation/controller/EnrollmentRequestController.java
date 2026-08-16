@@ -23,7 +23,27 @@ import org.springframework.web.bind.annotation.*;
 public class EnrollmentRequestController {
 
     private final EnrollmentRequestService enrollmentRequestService;
+    private final com.dunx.swpoolm.operation.service.EnrollmentRequestExcelService enrollmentRequestExcelService;
     private final MessageService messageService;
+
+    @GetMapping("/export")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<byte[]> exportMyRequests(
+            @RequestParam(required = false) com.dunx.swpoolm.operation.enums.RequestStatus status,
+            @RequestParam(required = false) RequestType requestType,
+            Authentication authentication) throws java.io.IOException {
+
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        byte[] excelBytes = enrollmentRequestExcelService.exportTeacherRequests(
+                userDetails.getUser().getId(), status, requestType);
+
+        String filename = "Yeu_Cau_Cua_Toi_" + java.time.LocalDate.now() + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelBytes);
+    }
 
     @PostMapping
     @PreAuthorize("hasRole('TEACHER')")

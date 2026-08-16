@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ListChecks, Plus, Search, UserPlus, Users, Shield, Info, Eye, CheckCircle } from 'lucide-react'
-import { getMyEnrollmentRequests, createEnrollmentRequest, getTeacherStudents, createTeacherStudent, getMyStudents } from '../../lib/apiTeacher'
-import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
+import { getMyEnrollmentRequests, createEnrollmentRequest, getTeacherStudents, createTeacherStudent, getMyStudents, exportTeacherRequests } from '../../lib/apiTeacher'
+import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips, ExportButton } from '../../components/ui'
 import { useAuth } from '../../store/auth'
 import { useRequestNotification } from '../../store/notifications'
 import { toast } from '../../components/ui/Toast'
@@ -9,6 +9,7 @@ import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
 import { getTodayDate, addDays, formatDisplayDate, formatISODate } from '../../lib/dateUtils'
 import { useSystemSettings } from '../../lib/settings'
+import { downloadFile } from '../../lib/fileDownload'
 
 const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
 const STATUS_COLOR = { PENDING: 'amber', APPROVED: 'green', REJECTED: 'red' }
@@ -37,6 +38,14 @@ export default function TeacherRequests() {
       .finally(() => setLoading(false))
   }
 
+  const handleExport = () => downloadFile(
+    () => exportTeacherRequests({
+      requestType: requestType || undefined,
+      status: status || undefined
+    }),
+    `Yeu_Cau_Cua_Toi_${getTodayDate()}.xlsx`
+  )
+
   useEffect(() => { setPage(1) }, [status, requestType])
   useEffect(() => { load() }, [status, requestType, page])
 
@@ -62,6 +71,7 @@ export default function TeacherRequests() {
               Đánh dấu đã xem tất cả ({teacherNewResponseCount})
             </Button>
           )}
+          <ExportButton onExport={handleExport} />
           <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" /> Tạo yêu cầu</Button>
         </div>
       </div>

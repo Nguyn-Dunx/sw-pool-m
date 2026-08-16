@@ -27,4 +27,13 @@ public interface TeacherRepository extends JpaRepository<Teacher, UUID> {
             @Param("keyword") String keyword,
             @Param("status") com.dunx.swpoolm.teacher.enums.TeacherStatus status,
             Pageable pageable);
+
+    @Query("SELECT t FROM Teacher t JOIN t.user u WHERE " +
+            "(:status IS NULL OR t.status = :status) AND (" +
+            "LOWER(t.fullName) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%')) " +
+            "OR u.phoneNumber LIKE CONCAT('%', COALESCE(:keyword, ''), '%')) " +
+            "ORDER BY t.createdAt DESC")
+    java.util.List<Teacher> exportTeachers(
+            @Param("keyword") String keyword,
+            @Param("status") com.dunx.swpoolm.teacher.enums.TeacherStatus status);
 }

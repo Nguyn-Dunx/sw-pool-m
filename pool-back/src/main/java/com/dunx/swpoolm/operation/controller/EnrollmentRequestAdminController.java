@@ -23,7 +23,28 @@ import java.util.UUID;
 public class EnrollmentRequestAdminController {
 
     private final EnrollmentRequestService enrollmentRequestService;
+    private final com.dunx.swpoolm.operation.service.EnrollmentRequestExcelService enrollmentRequestExcelService;
     private final MessageService messageService;
+
+    @GetMapping("/export")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> exportRequests(
+            @RequestParam(required = false) RequestStatus status,
+            @RequestParam(required = false) RequestType requestType,
+            @RequestParam(required = false) com.dunx.swpoolm.operation.enums.SwimStyle swimStyle,
+            @RequestParam(required = false) Boolean isGuaranteed,
+            @RequestParam(required = false) String searchName) throws java.io.IOException {
+
+        byte[] excelBytes = enrollmentRequestExcelService.exportAdminRequests(
+                status, requestType, swimStyle, isGuaranteed, searchName);
+
+        String filename = "Yeu_Cau_Dang_Ky_" + java.time.LocalDate.now() + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelBytes);
+    }
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")

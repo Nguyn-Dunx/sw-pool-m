@@ -131,4 +131,38 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             @Param("status") EnrollmentStatus status,
             Pageable pageable);
 
+    // Admin: Export danh sách Enrollment
+    @Query("SELECT e FROM Enrollment e JOIN FETCH e.student " +
+            "WHERE (:status IS NULL OR e.status = :status) " +
+            "AND (:swimStyle IS NULL OR e.swimStyle = :swimStyle) " +
+            "AND (:isGuaranteed IS NULL OR e.isGuaranteed = :isGuaranteed) " +
+            "AND LOWER(e.student.fullName) " +
+                "LIKE LOWER(CONCAT('%', COALESCE(:studentName, ''), '%')) " +
+            "ORDER BY e.createdAt DESC")
+    List<Enrollment> exportAllWithFilters(
+            @Param("status") EnrollmentStatus status,
+            @Param("swimStyle") SwimStyle swimStyle,
+            @Param("isGuaranteed") Boolean isGuaranteed,
+            @Param("studentName") String studentName);
+
+    @Query("SELECT e FROM Enrollment e JOIN FETCH e.student JOIN e.teachers t " +
+            "WHERE t.id = :teacherId " +
+            "AND (:status IS NULL OR e.status = :status) " +
+            "ORDER BY e.createdAt DESC")
+    List<Enrollment> exportAllByTeacherWithFilters(
+            @Param("teacherId") UUID teacherId,
+            @Param("status") EnrollmentStatus status);
+
+    @Query("SELECT e FROM Enrollment e JOIN FETCH e.student JOIN e.teachers t WHERE t.id = :teacherId " +
+           "AND (:status IS NULL OR e.status = :status) " +
+           "AND (:swimStyle IS NULL OR e.swimStyle = :swimStyle) " +
+           "AND (:isGuaranteed IS NULL OR e.isGuaranteed = :isGuaranteed) " +
+           "AND LOWER(e.student.fullName) LIKE LOWER(CONCAT('%', COALESCE(:studentName, ''), '%')) " +
+           "ORDER BY e.startDate DESC")
+    List<Enrollment> exportTeacherEnrollmentsWithFilters(
+            @Param("teacherId") UUID teacherId,
+            @Param("status") EnrollmentStatus status,
+            @Param("swimStyle") SwimStyle swimStyle,
+            @Param("isGuaranteed") Boolean isGuaranteed,
+            @Param("studentName") String studentName);
 }

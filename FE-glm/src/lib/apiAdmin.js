@@ -17,22 +17,26 @@ export const getEnrollmentDetail = async (id) => unwrap(await api.get(`/admin/en
 export const createEnrollment = async (body) => unwrap(await api.post('/admin/enrollments', body))
 export const updateEnrollment = async (id, body) => unwrap(await api.put(`/admin/enrollments/${id}`, body))
 export const completeEnrollment = async (id) => unwrap(await api.put(`/admin/enrollments/${id}/complete`))
+export const exportEnrollments = (params) => api.get('/admin/enrollments/export' + qs(params), { responseType: 'blob' })
 
 // ===== Enrollment Requests =====
 export const getEnrollmentRequests = async (params) => unwrapPage(await api.get('/admin/enrollment-requests' + qs({ ...params, searchName: params.studentName || params.searchName || params.search || params.keyword })))
 export const reviewEnrollmentRequest = async (id, body) => unwrap(await api.put(`/admin/enrollment-requests/${id}/review`, body))
+export const exportEnrollmentRequests = (params) => api.get('/admin/enrollment-requests/export' + qs({ ...params, searchName: params.studentName || params.searchName || params.search || params.keyword }), { responseType: 'blob' })
 
 // ===== Students =====
 export const getStudents = async (params) => unwrapPage(await api.get('/admin/students' + qs({ ...params, keyword: params.studentName || params.keyword })))
 export const createStudent = async (body) => unwrap(await api.post('/admin/students', body))
 export const updateStudent = async (id, body) => unwrap(await api.put(`/admin/students/${id}`, body))
 export const deleteStudent = async (id) => unwrap(await api.delete(`/admin/students/${id}`))
+export const exportStudents = (params) => api.get('/admin/students/export' + qs({ ...params, keyword: params.studentName || params.keyword }), { responseType: 'blob' })
 
 // ===== Teachers =====
 export const getTeachers = async (params) => unwrapPage(await api.get('/admin/teachers' + qs({ ...params, keyword: params.teacherName || params.keyword })))
 export const createTeacher = async (body) => unwrap(await api.post('/admin/teachers', body))
 export const updateTeacher = async (id, body) => unwrap(await api.put(`/admin/teachers/${id}`, body))
 export const deleteTeacher = async (id) => unwrap(await api.delete(`/admin/teachers/${id}`))
+export const exportTeachers = (params) => api.get('/admin/teachers/export' + qs({ ...params, keyword: params.teacherName || params.keyword }), { responseType: 'blob' })
 
 // ===== Alerts =====
 export const getAlerts = async () => unwrap(await api.get('/alerts'))

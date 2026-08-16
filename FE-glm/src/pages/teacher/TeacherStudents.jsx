@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Users, Eye, Calendar, CheckCircle, CheckCircle2, ChevronDown, ChevronUp, Shield, AlertTriangle } from 'lucide-react'
-import { getMyStudents, getMyStudentDetail, getStudentHistory, checkInStudent, getShifts, completeMyEnrollment } from '../../lib/apiTeacher'
-import { Badge, Button, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
+import { getMyStudents, getMyStudentDetail, getStudentHistory, checkInStudent, getShifts, completeMyEnrollment, exportTeacherStudents, exportStudentHistory } from '../../lib/apiTeacher'
+import { Badge, Button, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips, ExportButton } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
+import { downloadFile } from '../../lib/fileDownload'
+import { getTodayDate } from '../../lib/dateUtils'
 
 const STATUS = { ACTIVE: 'green', COMPLETED: 'blue', EXPIRED: 'gray' }
 const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
@@ -33,8 +35,8 @@ export default function TeacherStudents() {
     setLoading(true)
     getMyStudents({
       searchName: debouncedSearch,
-      status,
-      swimStyle,
+      status: status || undefined,
+      swimStyle: swimStyle || undefined,
       isGuaranteed: isGuaranteed === '' ? undefined : isGuaranteed === 'true' || isGuaranteed === true,
       page,
       size: 10
@@ -44,6 +46,16 @@ export default function TeacherStudents() {
       .finally(() => setLoading(false))
   }
 
+  const handleExport = () => downloadFile(
+    () => exportTeacherStudents({
+      searchName: debouncedSearch,
+      status: status || undefined,
+      swimStyle: swimStyle || undefined,
+      isGuaranteed: isGuaranteed === '' ? undefined : isGuaranteed === 'true' || isGuaranteed === true
+    }),
+    `Hoc_Vien_Phu_Trach_${getTodayDate()}.xlsx`
+  )
+
   useEffect(() => { setPage(1) }, [debouncedSearch, status, swimStyle, isGuaranteed])
   useEffect(() => { load() }, [debouncedSearch, status, swimStyle, isGuaranteed, page])
 
@@ -51,9 +63,12 @@ export default function TeacherStudents() {
 
   return (
     <div className="space-y-4">
-      <div className="animate-fade-in">
-        <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Học viên của tôi</h1>
-        <p className="text-sm text-ink-500 mt-1">Danh sách học viên đang phụ trách — Nhấn vào biểu tượng lọc ở từng tiêu đề cột để lọc</p>
+      <div className="flex items-center justify-between flex-wrap gap-3 animate-fade-in">
+        <div>
+          <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Học viên của tôi</h1>
+          <p className="text-sm text-ink-500 mt-1">Danh sách học viên đang phụ trách — Nhấn vào biểu tượng lọc ở từng tiêu đề cột để lọc</p>
+        </div>
+        <ExportButton onExport={handleExport} />
       </div>
 
       {/* Thanh hiển thị các bộ lọc đang kích hoạt */}
@@ -358,11 +373,21 @@ function StudentDetailModal({ enrollmentId, onClose, onReload }) {
 
           {/* Attendance History Section */}
           <div className="bg-white rounded-2xl border border-ink-100/80 overflow-hidden shadow-xs">
-            <div className="px-4 py-3 bg-ink-50/60 border-b border-ink-100 flex items-center justify-between">
+            <div className="px-4 py-3 bg-ink-50/60 border-b border-ink-100 flex items-center justify-between flex-wrap gap-2">
               <h4 className="font-semibold text-ink-800 text-sm flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-pool-600" />
                 Lịch sử điểm danh ({history.length} buổi)
               </h4>
+              {history.length > 0 && (
+                <ExportButton
+                  size="sm"
+                  label="Xuất lịch sử"
+                  onExport={() => downloadFile(
+                    () => exportStudentHistory(enrollmentId),
+                    `Lich_Su_Diem_Danh_${data?.studentName || 'Hoc_Vien'}_${getTodayDate()}.xlsx`
+                  )}
+                />
+              )}
             </div>
 
             <div className="max-h-60 overflow-y-auto">

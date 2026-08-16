@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { GraduationCap, Plus, Search, Eye, CheckCircle, Pencil, X, Shield, Users, AlertTriangle } from 'lucide-react'
-import { getEnrollments, getEnrollmentDetail, createEnrollment, updateEnrollment, completeEnrollment, getStudents, getTeachers } from '../../lib/apiAdmin'
-import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
+import { getEnrollments, getEnrollmentDetail, createEnrollment, updateEnrollment, completeEnrollment, getStudents, getTeachers, exportEnrollments } from '../../lib/apiAdmin'
+import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips, ExportButton } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
 import { getTodayDate, addDays, formatDisplayDate } from '../../lib/dateUtils'
 import { useSystemSettings } from '../../lib/settings'
+import { downloadFile } from '../../lib/fileDownload'
 
 const STATUS = { ACTIVE: 'green', COMPLETED: 'blue', EXPIRED: 'gray' }
 const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
@@ -47,6 +48,16 @@ export default function AdminEnrollments() {
       .finally(() => setLoading(false))
   }
 
+  const handleExport = () => downloadFile(
+    () => exportEnrollments({
+      studentName: debouncedSearch,
+      status: status || undefined,
+      swimStyle: swimStyle || undefined,
+      isGuaranteed: isGuaranteed === 'true' ? true : isGuaranteed === 'false' ? false : undefined
+    }),
+    `Danh_Sach_Khoa_Hoc_${getTodayDate()}.xlsx`
+  )
+
   useEffect(() => { setPage(1) }, [debouncedSearch, status, swimStyle, isGuaranteed])
   useEffect(() => { load() }, [debouncedSearch, status, swimStyle, isGuaranteed, page])
 
@@ -60,7 +71,10 @@ export default function AdminEnrollments() {
           <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Khóa học</h1>
           <p className="text-sm text-ink-500 mt-1">Quản lý đăng ký khóa học bơi — Lọc trực tiếp trên từng cột</p>
         </div>
-        <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" /> Tạo khóa học</Button>
+        <div className="flex items-center gap-2">
+          <ExportButton onExport={handleExport} />
+          <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" /> Tạo khóa học</Button>
+        </div>
       </div>
 
       {/* Thanh hiển thị các bộ lọc đang kích hoạt */}

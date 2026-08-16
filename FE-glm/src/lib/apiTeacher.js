@@ -16,6 +16,8 @@ export const getMyStudents = async (params) => unwrapPage(await api.get('/teache
 export const getMyStudentDetail = async (enrollmentId) => unwrap(await api.get(`/teacher/enrollments/${enrollmentId}`))
 export const getStudentHistory = async (enrollmentId) => unwrap(await api.get(`/teacher/enrollments/${enrollmentId}/history`))
 export const completeMyEnrollment = async (enrollmentId) => unwrap(await api.put(`/teacher/enrollments/${enrollmentId}/complete`))
+export const exportTeacherStudents = (params) => api.get('/teacher/enrollments/export' + qs({ ...params, searchName: params.studentName || params.searchName }), { responseType: 'blob' })
+export const exportStudentHistory = (enrollmentId) => api.get(`/teacher/enrollments/${enrollmentId}/history/export`, { responseType: 'blob' })
 
 // ===== Students (cho dropdown tạo request) =====
 export const getTeacherStudents = async (params) => unwrapPage(await api.get('/teacher/students' + qs(params)))
@@ -30,6 +32,7 @@ export const checkInStudent = async (body) => unwrap(await api.post('/teacher/at
 // ===== Enrollment Requests =====
 export const createEnrollmentRequest = async (body) => unwrap(await api.post('/teacher/enrollment-requests', body))
 export const getMyEnrollmentRequests = async (params) => unwrapPage(await api.get('/teacher/enrollment-requests' + qs(params)))
+export const exportTeacherRequests = (params) => api.get('/teacher/enrollment-requests/export' + qs(params), { responseType: 'blob' })
 
 // ===== Alerts (Teacher cũng xem được) =====
 export const getTeacherAlerts = async () => unwrap(await api.get('/alerts'))

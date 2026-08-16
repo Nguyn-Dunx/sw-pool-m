@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ClipboardCheck, CheckCircle, XCircle, Eye, Search, Shield, X, User } from 'lucide-react'
-import { getEnrollmentRequests, reviewEnrollmentRequest, getTeachers, getEnrollmentDetail } from '../../lib/apiAdmin'
-import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
+import { getEnrollmentRequests, reviewEnrollmentRequest, getTeachers, getEnrollmentDetail, exportEnrollmentRequests } from '../../lib/apiAdmin'
+import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips, ExportButton } from '../../components/ui'
 import { useAuth } from '../../store/auth'
 import { useRequestNotification } from '../../store/notifications'
 import { toast } from '../../components/ui/Toast'
@@ -9,6 +9,7 @@ import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
 import { getTodayDate, addDays, formatDisplayDate, formatISODate } from '../../lib/dateUtils'
 import { useSystemSettings } from '../../lib/settings'
+import { downloadFile } from '../../lib/fileDownload'
 
 const STYLE = { FROG: 'Ếch', FREE: 'Sải', BACK: 'Ngửa', FLY: 'Bướm' }
 const STATUS_COLOR = { PENDING: 'amber', APPROVED: 'green', REJECTED: 'red' }
@@ -49,6 +50,17 @@ export default function AdminEnrollmentRequests() {
       .finally(() => setLoading(false))
   }
 
+  const handleExport = () => downloadFile(
+    () => exportEnrollmentRequests({
+      status: status || undefined,
+      requestType: requestType || undefined,
+      swimStyle: swimStyle || undefined,
+      isGuaranteed: isGuaranteed === 'true' ? true : isGuaranteed === 'false' ? false : undefined,
+      search: debouncedSearch || undefined
+    }),
+    `Yeu_Cau_Dang_Ky_${getTodayDate()}.xlsx`
+  )
+
   useEffect(() => { setPage(1) }, [status, requestType, debouncedSearch, swimStyle, isGuaranteed])
   useEffect(() => { load() }, [status, requestType, debouncedSearch, swimStyle, isGuaranteed, page])
 
@@ -57,9 +69,12 @@ export default function AdminEnrollmentRequests() {
 
   return (
     <div className="space-y-4">
-      <div className="animate-fade-in">
-        <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Yêu cầu đăng ký</h1>
-        <p className="text-sm text-ink-500 mt-1">Duyệt yêu cầu tạo/cập nhật khóa học từ giáo viên — Lọc trực tiếp trên từng cột</p>
+      <div className="flex items-center justify-between flex-wrap gap-3 animate-fade-in">
+        <div>
+          <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Yêu cầu đăng ký</h1>
+          <p className="text-sm text-ink-500 mt-1">Duyệt yêu cầu tạo/cập nhật khóa học từ giáo viên — Lọc trực tiếp trên từng cột</p>
+        </div>
+        <ExportButton onExport={handleExport} />
       </div>
 
       {/* Thanh hiển thị các bộ lọc đang kích hoạt */}
