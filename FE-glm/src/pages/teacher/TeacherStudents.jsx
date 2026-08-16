@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Users, Eye, Calendar, CheckCircle, CheckCircle2, ChevronDown, ChevronUp, Shield } from 'lucide-react'
+import { Users, Eye, Calendar, CheckCircle, CheckCircle2, ChevronDown, ChevronUp, Shield, AlertTriangle } from 'lucide-react'
 import { getMyStudents, getMyStudentDetail, getStudentHistory, checkInStudent, getShifts, completeMyEnrollment } from '../../lib/apiTeacher'
 import { Badge, Button, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
@@ -244,6 +244,7 @@ function StudentDetailModal({ enrollmentId, onClose, onReload }) {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCheckIn, setShowCheckIn] = useState(false)
+  const [showConfirmClose, setShowConfirmClose] = useState(false)
   const [completing, setCompleting] = useState(false)
 
   const load = () => {
@@ -262,17 +263,6 @@ function StudentDetailModal({ enrollmentId, onClose, onReload }) {
   }
 
   useEffect(() => { load() }, [enrollmentId])
-
-  const handleComplete = async () => {
-    if (!confirm('Xác nhận hoàn thành khóa học này?')) return
-    setCompleting(true)
-    try {
-      await completeMyEnrollment(enrollmentId)
-      toast.success('Đã hoàn thành khóa học')
-      load()
-      onReload && onReload()
-    } catch (e) { toast.error(errMsg(e)) } finally { setCompleting(false) }
-  }
 
   const calcDaysRemaining = (expireDate) => {
     if (!expireDate) return null
@@ -316,8 +306,8 @@ function StudentDetailModal({ enrollmentId, onClose, onReload }) {
                 <Button size="sm" onClick={() => setShowCheckIn(true)}>
                   <Calendar className="w-4 h-4" /> Điểm danh ngay
                 </Button>
-                <Button size="sm" variant="success" onClick={handleComplete} disabled={completing}>
-                  <CheckCircle2 className="w-4 h-4" /> Hoàn thành khóa
+                <Button size="sm" variant="danger" onClick={() => setShowConfirmClose(true)}>
+                  <AlertTriangle className="w-4 h-4" /> Đóng khóa học
                 </Button>
               </div>
             )}
@@ -420,6 +410,52 @@ function StudentDetailModal({ enrollmentId, onClose, onReload }) {
             onReload && onReload()
           }}
         />
+      )}
+
+      {showConfirmClose && (
+        <Modal open onClose={() => setShowConfirmClose(false)} title="Xác nhận đóng khóa học" size="sm">
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3.5 bg-rose-50 border border-rose-200/80 rounded-xl text-rose-900">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-rose-900">Cảnh báo đóng khóa học</p>
+                <p className="text-rose-700 mt-1">
+                  Bạn có chắc chắn muốn đóng khóa học của học viên <strong className="text-rose-950">{data?.studentName}</strong>?
+                </p>
+                <p className="text-xs text-rose-600 mt-2">
+                  Sau khi đóng, khóa học sẽ chuyển sang trạng thái <strong>Hoàn thành (COMPLETED)</strong> và học viên sẽ không thể tiếp tục điểm danh.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" onClick={() => setShowConfirmClose(false)} className="flex-1">
+                Hủy bỏ
+              </Button>
+              <Button
+                variant="danger"
+                onClick={async () => {
+                  setCompleting(true)
+                  try {
+                    await completeMyEnrollment(enrollmentId)
+                    toast.success('Đã hoàn thành khóa học')
+                    setShowConfirmClose(false)
+                    load()
+                    onReload && onReload()
+                  } catch (e) {
+                    toast.error(errMsg(e))
+                  } finally {
+                    setCompleting(false)
+                  }
+                }}
+                disabled={completing}
+                className="flex-1"
+              >
+                {completing ? 'Đang đóng...' : 'Xác nhận đóng'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </Modal>
   )

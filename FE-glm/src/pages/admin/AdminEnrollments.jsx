@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { GraduationCap, Plus, Search, Eye, CheckCircle, Pencil, X, Shield, Users } from 'lucide-react'
+import { GraduationCap, Plus, Search, Eye, CheckCircle, Pencil, X, Shield, Users, AlertTriangle } from 'lucide-react'
 import { getEnrollments, getEnrollmentDetail, createEnrollment, updateEnrollment, completeEnrollment, getStudents, getTeachers } from '../../lib/apiAdmin'
 import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips } from '../../components/ui'
 import { toast } from '../../components/ui/Toast'
@@ -208,6 +208,8 @@ function Info({ label, value }) {
 function DetailModal({ id, onClose, onEdit, onReload }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showConfirmClose, setShowConfirmClose] = useState(false)
+  const [completing, setCompleting] = useState(false)
 
   const loadDetail = () => {
     setLoading(true)
@@ -219,13 +221,18 @@ function DetailModal({ id, onClose, onEdit, onReload }) {
   }, [id])
 
   const handleComplete = async () => {
-    if (!confirm('Đóng khóa học này? Học viên sẽ không thể điểm danh thêm.')) return
+    setCompleting(true)
     try {
       await completeEnrollment(id)
       toast.success('Đã đóng khóa học')
+      setShowConfirmClose(false)
       onReload?.()
       onClose()
-    } catch (e) { toast.error(errMsg(e)) }
+    } catch (e) {
+      toast.error(errMsg(e))
+    } finally {
+      setCompleting(false)
+    }
   }
 
   return (
@@ -279,11 +286,39 @@ function DetailModal({ id, onClose, onEdit, onReload }) {
               <Pencil className="w-4 h-4" /> Sửa thông tin / Trạng thái
             </Button>
             {data.status === 'ACTIVE' && (
-              <Button variant="danger" onClick={handleComplete} className="flex-1">
-                <CheckCircle className="w-4 h-4" /> Đóng khóa học
+              <Button variant="danger" onClick={() => setShowConfirmClose(true)} className="flex-1">
+                <AlertTriangle className="w-4 h-4" /> Đóng khóa học
               </Button>
             )}
           </div>
+
+          {showConfirmClose && (
+            <Modal open onClose={() => setShowConfirmClose(false)} title="Xác nhận đóng khóa học" size="sm">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-3.5 bg-rose-50 border border-rose-200/80 rounded-xl text-rose-900">
+                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-semibold text-rose-900">Cảnh báo: Hành động quan trọng</p>
+                    <p className="text-rose-700 mt-1">
+                      Bạn có chắc chắn muốn đóng khóa học cho học viên <strong className="text-rose-950">{data.studentName}</strong>?
+                    </p>
+                    <p className="text-xs text-rose-600 mt-2">
+                      Sau khi đóng, khóa học sẽ chuyển sang trạng thái <strong>Hoàn thành (COMPLETED)</strong> và học viên sẽ không thể tiếp tục điểm danh.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-1">
+                  <Button variant="outline" onClick={() => setShowConfirmClose(false)} className="flex-1">
+                    Hủy bỏ
+                  </Button>
+                  <Button variant="danger" onClick={handleComplete} disabled={completing} className="flex-1">
+                    {completing ? 'Đang đóng...' : 'Xác nhận đóng'}
+                  </Button>
+                </div>
+              </div>
+            </Modal>
+          )}
         </div>
       ) : <p className="text-ink-500">Không tìm thấy dữ liệu.</p>}
     </Modal>
