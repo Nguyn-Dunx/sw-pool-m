@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+  flyway:
+    enabled: false
+
+app:
+  security:
+    remember-me-key: test-remember-me-key
+    session-timeout-minutes: 60
+    remember-me-cookie-max-age-days: 30
+    csrf-header-name: X-XSRF-TOKEN
+    csrf-cookie-name: XSRF-TOKEN
