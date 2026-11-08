@@ -10,6 +10,7 @@ import com.dunx.swpoolm.common.setting.service.SettingService;
 import com.dunx.swpoolm.operation.dto.*;
 import com.dunx.swpoolm.operation.entity.Enrollment;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
+import com.dunx.swpoolm.operation.enums.PaymentStatus;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import com.dunx.swpoolm.operation.repository.AttendanceRecordRepository;
 import com.dunx.swpoolm.operation.repository.EnrollmentRepository;
@@ -179,21 +180,33 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         log.info("Khóa học của {} đã được đóng (COMPLETED) thủ công", enrollment.getStudent().getFullName());
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updatePaymentStatus(UUID enrollmentId, PaymentStatus paymentStatus) {
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Common.NOT_FOUND));
+
+        enrollment.setPaymentStatus(paymentStatus);
+        enrollmentRepository.save(enrollment);
+        log.info("Admin cập nhật học phí khóa học {} thành {}", enrollmentId, paymentStatus);
+    }
+
     // ===================== LIST & DETAIL =====================
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<EnrollmentResponse> getEnrollments(EnrollmentStatus status, SwimStyle swimStyle, Boolean isGuaranteed,
-                                                            String studentName, UUID teacherId, int page, int size) {
+                                                            PaymentStatus paymentStatus, String studentName, UUID teacherId,
+                                                            int page, int size) {
         Pageable pageable = PageRequestValidator.validate(page, size);
         Page<Enrollment> enrollmentPage;
 
         if (teacherId != null) {
             // Filter theo teacher
-            enrollmentPage = enrollmentRepository.findAllByTeacherWithFilters(teacherId, status, pageable);
+            enrollmentPage = enrollmentRepository.findAllByTeacherWithFilters(teacherId, status, paymentStatus, pageable);
         } else {
             // Filter tổng hợp
-            enrollmentPage = enrollmentRepository.findAllWithFilters(status, swimStyle, isGuaranteed, studentName, pageable);
+            enrollmentPage = enrollmentRepository.findAllWithFilters(status, swimStyle, isGuaranteed, paymentStatus, studentName, pageable);
         }
 
         List<EnrollmentResponse> responses = enrollmentPage.getContent().stream()
@@ -250,6 +263,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 .startDate(enrollment.getStartDate())
                 .expireDate(enrollment.getExpireDate())
                 .status(enrollment.getStatus())
+                .paymentStatus(enrollment.getPaymentStatus())
                 .attendanceHistory(history)
                 .studentPhone(enrollment.getStudent().getPhoneNumber())
                 .studentDob(enrollment.getStudent().getDob())
@@ -293,6 +307,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 .startDate(enrollment.getStartDate())
                 .expireDate(enrollment.getExpireDate())
                 .status(enrollment.getStatus())
+                .paymentStatus(enrollment.getPaymentStatus())
                 .build();
     }
 }

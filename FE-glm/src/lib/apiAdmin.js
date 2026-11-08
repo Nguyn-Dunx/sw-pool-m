@@ -17,6 +17,7 @@ export const getEnrollmentDetail = async (id) => unwrap(await api.get(`/admin/en
 export const createEnrollment = async (body) => unwrap(await api.post('/admin/enrollments', body))
 export const updateEnrollment = async (id, body) => unwrap(await api.put(`/admin/enrollments/${id}`, body))
 export const completeEnrollment = async (id) => unwrap(await api.put(`/admin/enrollments/${id}/complete`))
+export const updateEnrollmentPaymentStatus = async (id, paymentStatus) => unwrap(await api.put(`/admin/enrollments/${id}/payment-status`, { paymentStatus }))
 export const exportEnrollments = (params) => api.get('/admin/enrollments/export' + qs(params), { responseType: 'blob' })
 
 // ===== Enrollment Requests =====

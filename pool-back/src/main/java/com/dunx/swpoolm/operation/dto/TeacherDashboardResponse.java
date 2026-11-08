@@ -1,5 +1,6 @@
 package com.dunx.swpoolm.operation.dto;
 
+import com.dunx.swpoolm.operation.enums.PaymentStatus;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import lombok.Builder;
 import lombok.Data;
@@ -27,4 +28,5 @@ public class TeacherDashboardResponse {
     // Bổ sung thêm
     private String studentPhone;
     private com.dunx.swpoolm.operation.enums.EnrollmentStatus status;
+    private PaymentStatus paymentStatus;
 }

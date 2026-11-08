@@ -9,6 +9,7 @@ import com.dunx.swpoolm.operation.entity.AttendanceRecord;
 import com.dunx.swpoolm.operation.entity.Enrollment;
 import com.dunx.swpoolm.operation.entity.Shift;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
+import com.dunx.swpoolm.operation.enums.PaymentStatus;
 import com.dunx.swpoolm.operation.enums.ShiftPeriod;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import com.dunx.swpoolm.operation.repository.AttendanceRecordRepository;
@@ -264,6 +265,59 @@ class TeacherOperationServiceTest {
 
             assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.COMPLETED);
             verify(enrollmentRepository).save(enrollment);
+        }
+    }
+
+    @Nested
+    @DisplayName("updatePaymentStatus() - Teacher")
+    class UpdatePaymentStatusTests {
+
+        @Test
+        @DisplayName("Giáo viên cập nhật học phí của khóa học được phân công thành công")
+        void updatePaymentStatus_assignedTeacher_success() {
+            UUID userId = UUID.randomUUID();
+            UUID enrollmentId = UUID.randomUUID();
+            Teacher teacher = Teacher.builder().fullName("Teacher A").build();
+            teacher.setId(UUID.randomUUID());
+            Enrollment enrollment = Enrollment.builder()
+                    .paymentStatus(PaymentStatus.UNPAID)
+                    .teachers(new HashSet<>(List.of(teacher)))
+                    .build();
+            enrollment.setId(enrollmentId);
+
+            when(teacherRepository.findByUserId(userId)).thenReturn(Optional.of(teacher));
+            when(enrollmentRepository.findById(enrollmentId)).thenReturn(Optional.of(enrollment));
+
+            teacherOperationService.updatePaymentStatus(userId, enrollmentId, PaymentStatus.PAID);
+
+            assertThat(enrollment.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+            verify(enrollmentRepository).save(enrollment);
+        }
+
+        @Test
+        @DisplayName("Giáo viên không được phép cập nhật học phí khóa học không phụ trách")
+        void updatePaymentStatus_unassignedTeacher_throwsAppException() {
+            UUID userId = UUID.randomUUID();
+            UUID enrollmentId = UUID.randomUUID();
+            Teacher teacher = Teacher.builder().fullName("Teacher A").build();
+            teacher.setId(UUID.randomUUID());
+            Teacher otherTeacher = Teacher.builder().fullName("Other Teacher").build();
+            otherTeacher.setId(UUID.randomUUID());
+            Enrollment enrollment = Enrollment.builder()
+                    .paymentStatus(PaymentStatus.UNKNOWN)
+                    .teachers(new HashSet<>(List.of(otherTeacher)))
+                    .build();
+            enrollment.setId(enrollmentId);
+
+            when(teacherRepository.findByUserId(userId)).thenReturn(Optional.of(teacher));
+            when(enrollmentRepository.findById(enrollmentId)).thenReturn(Optional.of(enrollment));
+
+            AppException ex = assertThrows(AppException.class,
+                    () -> teacherOperationService.updatePaymentStatus(userId, enrollmentId, PaymentStatus.PAID));
+
+            assertThat(ex.getMessageKey()).isEqualTo(MessageKeys.Attendance.UNAUTHORIZED);
+            assertThat(enrollment.getPaymentStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+            verify(enrollmentRepository, never()).save(any(Enrollment.class));
         }
     }
 

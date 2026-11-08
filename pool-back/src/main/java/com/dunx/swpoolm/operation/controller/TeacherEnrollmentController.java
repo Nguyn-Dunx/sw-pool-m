@@ -6,8 +6,11 @@ import com.dunx.swpoolm.common.i18n.MessageKeys;
 import com.dunx.swpoolm.common.i18n.MessageService;
 import com.dunx.swpoolm.iam.security.CustomUserDetails;
 import com.dunx.swpoolm.operation.dto.AttendanceHistoryResponse;
+import com.dunx.swpoolm.operation.dto.PaymentStatusUpdateRequest;
 import com.dunx.swpoolm.operation.dto.TeacherDashboardResponse;
+import com.dunx.swpoolm.operation.enums.PaymentStatus;
 import com.dunx.swpoolm.operation.service.TeacherOperationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,11 +36,12 @@ public class TeacherEnrollmentController {
             @RequestParam(required = false) com.dunx.swpoolm.operation.enums.SwimStyle swimStyle,
             @RequestParam(required = false) com.dunx.swpoolm.operation.enums.EnrollmentStatus status,
             @RequestParam(required = false) Boolean isGuaranteed,
+            @RequestParam(required = false) PaymentStatus paymentStatus,
             Authentication authentication) throws java.io.IOException {
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         byte[] excelBytes = enrollmentExcelService.exportTeacherStudents(
-                userDetails.getUser().getId(), searchName, swimStyle, status, isGuaranteed);
+                userDetails.getUser().getId(), searchName, swimStyle, status, isGuaranteed, paymentStatus);
 
         String filename = "Hoc_Vien_Phu_Trach_" + java.time.LocalDate.now() + ".xlsx";
 
@@ -69,13 +73,14 @@ public class TeacherEnrollmentController {
             @RequestParam(required = false) com.dunx.swpoolm.operation.enums.SwimStyle swimStyle,
             @RequestParam(required = false) com.dunx.swpoolm.operation.enums.EnrollmentStatus status,
             @RequestParam(required = false) Boolean isGuaranteed,
+            @RequestParam(required = false) PaymentStatus paymentStatus,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             Authentication authentication) {
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         PageResponse<TeacherDashboardResponse> response = teacherOperationService.getMyStudents(
-                userDetails.getUser().getId(), searchName, swimStyle, status, isGuaranteed, page, size);
+                userDetails.getUser().getId(), searchName, swimStyle, status, isGuaranteed, paymentStatus, page, size);
 
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }
@@ -117,5 +122,19 @@ public class TeacherEnrollmentController {
         teacherOperationService.completeEnrollment(userDetails.getUser().getId(), enrollmentId);
 
         return ResponseEntity.ok(ApiResponse.success(null, messageService.get(MessageKeys.Common.SUCCESS)));
+    }
+
+    @PutMapping("/{enrollmentId}/payment-status")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ApiResponse<Void>> updatePaymentStatus(
+            @PathVariable UUID enrollmentId,
+            @Valid @RequestBody PaymentStatusUpdateRequest request,
+            Authentication authentication) {
+
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        teacherOperationService.updatePaymentStatus(
+                userDetails.getUser().getId(), enrollmentId, request.getPaymentStatus());
+
+        return ResponseEntity.ok(ApiResponse.success(null, messageService.get(MessageKeys.Common.UPDATED)));
     }
 }

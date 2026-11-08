@@ -14,6 +14,7 @@ import com.dunx.swpoolm.operation.entity.AttendanceRecord;
 import com.dunx.swpoolm.operation.entity.Enrollment;
 import com.dunx.swpoolm.operation.entity.Shift;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
+import com.dunx.swpoolm.operation.enums.PaymentStatus;
 import com.dunx.swpoolm.operation.repository.AttendanceRecordRepository;
 import com.dunx.swpoolm.operation.repository.EnrollmentAttendanceCount;
 import com.dunx.swpoolm.operation.repository.EnrollmentRepository;
@@ -121,7 +122,7 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
     @Transactional(readOnly = true)
     public PageResponse<TeacherDashboardResponse> getMyStudents(
             UUID userId, String searchName, com.dunx.swpoolm.operation.enums.SwimStyle swimStyle,
-            EnrollmentStatus status, Boolean isGuaranteed,
+            EnrollmentStatus status, Boolean isGuaranteed, PaymentStatus paymentStatus,
             int page, int size) {
 
         Teacher teacher = teacherRepository.findByUserId(userId)
@@ -130,7 +131,7 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
         Pageable pageable = PageRequestValidator.validate(page, size);
 
         Page<Enrollment> enrollmentPage = enrollmentRepository.findEnrollmentsByTeacherWithFilters(
-                teacher.getId(), status, swimStyle, isGuaranteed, searchName, pageable);
+                teacher.getId(), status, swimStyle, isGuaranteed, paymentStatus, searchName, pageable);
 
         if (enrollmentPage.isEmpty()) {
             return PageResponse.<TeacherDashboardResponse>builder()
@@ -175,6 +176,7 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
                     .daysRemaining(daysRemaining)
                     .studentPhone(enrollment.getStudent().getPhoneNumber())
                     .status(enrollment.getStatus())
+                    .paymentStatus(enrollment.getPaymentStatus())
                     .build();
         }).toList();
 
@@ -243,6 +245,26 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updatePaymentStatus(UUID userId, UUID enrollmentId, PaymentStatus paymentStatus) {
+        Teacher teacher = teacherRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
+
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Common.NOT_FOUND));
+
+        boolean isAssigned = enrollment.getTeachers().stream()
+                .anyMatch(t -> t.getId().equals(teacher.getId()));
+        if (!isAssigned) {
+            throw new AppException(MessageKeys.Attendance.UNAUTHORIZED);
+        }
+
+        enrollment.setPaymentStatus(paymentStatus);
+        enrollmentRepository.save(enrollment);
+        log.info("Teacher {} cập nhật học phí khóa học {} thành {}", teacher.getId(), enrollmentId, paymentStatus);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public com.dunx.swpoolm.operation.dto.EnrollmentDetailResponse getEnrollmentDetail(UUID userId, UUID enrollmentId) {
         Teacher teacher = teacherRepository.findByUserId(userId)
@@ -290,6 +312,7 @@ public class TeacherOperationServiceImpl implements TeacherOperationService {
                 .startDate(enrollment.getStartDate())
                 .expireDate(enrollment.getExpireDate())
                 .status(enrollment.getStatus())
+                .paymentStatus(enrollment.getPaymentStatus())
                 .attendanceHistory(history)
                 .studentPhone(enrollment.getStudent().getPhoneNumber())
                 .studentDob(enrollment.getStudent().getDob())

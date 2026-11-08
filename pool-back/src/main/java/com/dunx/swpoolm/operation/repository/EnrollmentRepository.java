@@ -2,6 +2,7 @@ package com.dunx.swpoolm.operation.repository;
 
 import com.dunx.swpoolm.operation.entity.Enrollment;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
+import com.dunx.swpoolm.operation.enums.PaymentStatus;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +31,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
            "AND (:status IS NULL OR e.status = :status) " +
            "AND (:swimStyle IS NULL OR e.swimStyle = :swimStyle) " +
            "AND (:isGuaranteed IS NULL OR e.isGuaranteed = :isGuaranteed) " +
+           "AND (:paymentStatus IS NULL OR e.paymentStatus = :paymentStatus) " +
 //           "AND (:studentName IS NULL OR LOWER(e.student.fullName) LIKE LOWER(CONCAT('%', :studentName, '%'))) " +
            "AND LOWER(e.student.fullName) LIKE LOWER(CONCAT('%', COALESCE(:studentName, ''), '%')) " +
            "ORDER BY e.startDate DESC")
@@ -38,6 +40,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             @Param("status") EnrollmentStatus status,
             @Param("swimStyle") SwimStyle swimStyle,
             @Param("isGuaranteed") Boolean isGuaranteed,
+            @Param("paymentStatus") PaymentStatus paymentStatus,
             @Param("studentName") String studentName,
             Pageable pageable
     );
@@ -111,6 +114,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             "WHERE (:status IS NULL OR e.status = :status) " +
             "AND (:swimStyle IS NULL OR e.swimStyle = :swimStyle) " +
             "AND (:isGuaranteed IS NULL OR e.isGuaranteed = :isGuaranteed) " +
+            "AND (:paymentStatus IS NULL OR e.paymentStatus = :paymentStatus) " +
             "AND LOWER(e.student.fullName) " +
                 "LIKE LOWER(CONCAT('%', COALESCE(:studentName, ''), '%')) " +
             "ORDER BY e.createdAt DESC")
@@ -118,6 +122,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             @Param("status") EnrollmentStatus status,
             @Param("swimStyle") SwimStyle swimStyle,
             @Param("isGuaranteed") Boolean isGuaranteed,
+            @Param("paymentStatus") PaymentStatus paymentStatus,
             @Param("studentName") String studentName,
             Pageable pageable);
 
@@ -125,10 +130,12 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     @Query("SELECT e FROM Enrollment e JOIN FETCH e.student JOIN e.teachers t " +
             "WHERE t.id = :teacherId " +
             "AND (:status IS NULL OR e.status = :status) " +
+            "AND (:paymentStatus IS NULL OR e.paymentStatus = :paymentStatus) " +
             "ORDER BY e.createdAt DESC")
     Page<Enrollment> findAllByTeacherWithFilters(
             @Param("teacherId") UUID teacherId,
             @Param("status") EnrollmentStatus status,
+            @Param("paymentStatus") PaymentStatus paymentStatus,
             Pageable pageable);
 
     // Admin: Export danh sách Enrollment
@@ -136,6 +143,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             "WHERE (:status IS NULL OR e.status = :status) " +
             "AND (:swimStyle IS NULL OR e.swimStyle = :swimStyle) " +
             "AND (:isGuaranteed IS NULL OR e.isGuaranteed = :isGuaranteed) " +
+            "AND (:paymentStatus IS NULL OR e.paymentStatus = :paymentStatus) " +
             "AND LOWER(e.student.fullName) " +
                 "LIKE LOWER(CONCAT('%', COALESCE(:studentName, ''), '%')) " +
             "ORDER BY e.createdAt DESC")
@@ -143,20 +151,24 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             @Param("status") EnrollmentStatus status,
             @Param("swimStyle") SwimStyle swimStyle,
             @Param("isGuaranteed") Boolean isGuaranteed,
+            @Param("paymentStatus") PaymentStatus paymentStatus,
             @Param("studentName") String studentName);
 
     @Query("SELECT e FROM Enrollment e JOIN FETCH e.student JOIN e.teachers t " +
             "WHERE t.id = :teacherId " +
             "AND (:status IS NULL OR e.status = :status) " +
+            "AND (:paymentStatus IS NULL OR e.paymentStatus = :paymentStatus) " +
             "ORDER BY e.createdAt DESC")
     List<Enrollment> exportAllByTeacherWithFilters(
             @Param("teacherId") UUID teacherId,
-            @Param("status") EnrollmentStatus status);
+            @Param("status") EnrollmentStatus status,
+            @Param("paymentStatus") PaymentStatus paymentStatus);
 
     @Query("SELECT e FROM Enrollment e JOIN FETCH e.student JOIN e.teachers t WHERE t.id = :teacherId " +
            "AND (:status IS NULL OR e.status = :status) " +
            "AND (:swimStyle IS NULL OR e.swimStyle = :swimStyle) " +
            "AND (:isGuaranteed IS NULL OR e.isGuaranteed = :isGuaranteed) " +
+           "AND (:paymentStatus IS NULL OR e.paymentStatus = :paymentStatus) " +
            "AND LOWER(e.student.fullName) LIKE LOWER(CONCAT('%', COALESCE(:studentName, ''), '%')) " +
            "ORDER BY e.startDate DESC")
     List<Enrollment> exportTeacherEnrollmentsWithFilters(
@@ -164,5 +176,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
             @Param("status") EnrollmentStatus status,
             @Param("swimStyle") SwimStyle swimStyle,
             @Param("isGuaranteed") Boolean isGuaranteed,
+            @Param("paymentStatus") PaymentStatus paymentStatus,
             @Param("studentName") String studentName);
 }

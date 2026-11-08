@@ -11,6 +11,7 @@ import com.dunx.swpoolm.operation.dto.EnrollmentResponse;
 import com.dunx.swpoolm.operation.dto.EnrollmentUpdateRequest;
 import com.dunx.swpoolm.operation.entity.Enrollment;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
+import com.dunx.swpoolm.operation.enums.PaymentStatus;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import com.dunx.swpoolm.operation.repository.AttendanceRecordRepository;
 import com.dunx.swpoolm.operation.repository.EnrollmentRepository;
@@ -107,6 +108,7 @@ class EnrollmentServiceTest {
             assertThat(response.getTotalQuota()).isEqualTo(15);
             assertThat(response.getIsGuaranteed()).isTrue();
             assertThat(response.getStatus()).isEqualTo(EnrollmentStatus.ACTIVE);
+            assertThat(response.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
             verify(enrollmentRepository).save(any(Enrollment.class));
         }
 
@@ -262,6 +264,28 @@ class EnrollmentServiceTest {
 
             assertThat(response).isNotNull();
             assertThat(response.getStatus()).isEqualTo(EnrollmentStatus.ACTIVE);
+        }
+    }
+
+    @Nested
+    @DisplayName("updatePaymentStatus()")
+    class UpdatePaymentStatusTests {
+
+        @Test
+        @DisplayName("Admin cập nhật trạng thái học phí thành công")
+        void updatePaymentStatus_success() {
+            UUID enrollmentId = UUID.randomUUID();
+            Enrollment enrollment = Enrollment.builder()
+                    .paymentStatus(PaymentStatus.UNKNOWN)
+                    .build();
+            enrollment.setId(enrollmentId);
+
+            when(enrollmentRepository.findById(enrollmentId)).thenReturn(Optional.of(enrollment));
+
+            enrollmentService.updatePaymentStatus(enrollmentId, PaymentStatus.PAID);
+
+            assertThat(enrollment.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+            verify(enrollmentRepository).save(enrollment);
         }
     }
 

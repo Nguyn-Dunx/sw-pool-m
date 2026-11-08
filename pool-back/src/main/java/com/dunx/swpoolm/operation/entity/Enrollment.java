@@ -2,6 +2,7 @@ package com.dunx.swpoolm.operation.entity;
 
 import com.dunx.swpoolm.common.entity.BaseEntity;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
+import com.dunx.swpoolm.operation.enums.PaymentStatus;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import com.dunx.swpoolm.student.entity.Student;
 import com.dunx.swpoolm.teacher.entity.Teacher;
@@ -51,6 +52,11 @@ public class Enrollment extends BaseEntity {
     @Column(name = "status", length = 20)
     @Builder.Default
     private EnrollmentStatus status = EnrollmentStatus.ACTIVE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", length = 20, nullable = false)
+    @Builder.Default
+    private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(

@@ -1,6 +1,7 @@
 package com.dunx.swpoolm.operation.dto;
 
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
+import com.dunx.swpoolm.operation.enums.PaymentStatus;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import lombok.Builder;
 import lombok.Data;
@@ -21,4 +22,5 @@ public class EnrollmentResponse {
     private LocalDate startDate;
     private LocalDate expireDate;
     private EnrollmentStatus status;
+    private PaymentStatus paymentStatus;
 }

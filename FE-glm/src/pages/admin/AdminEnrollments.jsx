@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { GraduationCap, Plus, Search, Eye, CheckCircle, Pencil, X, Shield, Users, AlertTriangle } from 'lucide-react'
-import { getEnrollments, getEnrollmentDetail, createEnrollment, updateEnrollment, completeEnrollment, getStudents, getTeachers, exportEnrollments } from '../../lib/apiAdmin'
+import { getEnrollments, getEnrollmentDetail, createEnrollment, updateEnrollment, completeEnrollment, updateEnrollmentPaymentStatus, getStudents, getTeachers, exportEnrollments } from '../../lib/apiAdmin'
 import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips, ExportButton } from '../../components/ui'
+import PaymentStatusSelect, { PAYMENT_STATUS_META, PAYMENT_STATUS_OPTIONS } from '../../components/ui/PaymentStatusSelect'
 import { toast } from '../../components/ui/Toast'
 import { errMsg } from '../../lib/api'
 import { useDebounce } from '../../lib/useDebounce'
@@ -21,6 +22,7 @@ export default function AdminEnrollments() {
   const [status, setStatus] = useState(searchParams.get('status') || '')
   const [swimStyle, setSwimStyle] = useState('')
   const [isGuaranteed, setIsGuaranteed] = useState('')
+  const [paymentStatus, setPaymentStatus] = useState('')
   const [page, setPage] = useState(1)
   const [detail, setDetail] = useState(null)
   const [editingId, setEditingId] = useState(null)
@@ -40,6 +42,7 @@ export default function AdminEnrollments() {
       status: status || undefined,
       swimStyle: swimStyle || undefined,
       isGuaranteed: isGuaranteed === 'true' ? true : isGuaranteed === 'false' ? false : undefined,
+      paymentStatus: paymentStatus || undefined,
       page,
       size: 10
     })
@@ -53,16 +56,27 @@ export default function AdminEnrollments() {
       studentName: debouncedSearch,
       status: status || undefined,
       swimStyle: swimStyle || undefined,
-      isGuaranteed: isGuaranteed === 'true' ? true : isGuaranteed === 'false' ? false : undefined
+      isGuaranteed: isGuaranteed === 'true' ? true : isGuaranteed === 'false' ? false : undefined,
+      paymentStatus: paymentStatus || undefined
     }),
     `Danh_Sach_Khoa_Hoc_${getTodayDate()}.xlsx`
   )
 
-  useEffect(() => { setPage(1) }, [debouncedSearch, status, swimStyle, isGuaranteed])
-  useEffect(() => { load() }, [debouncedSearch, status, swimStyle, isGuaranteed, page])
+  const handlePaymentStatusChange = async (id, nextStatus) => {
+    try {
+      await updateEnrollmentPaymentStatus(id, nextStatus)
+      toast.success('Đã cập nhật trạng thái học phí')
+      load()
+    } catch (e) {
+      toast.error(errMsg(e))
+    }
+  }
+
+  useEffect(() => { setPage(1) }, [debouncedSearch, status, swimStyle, isGuaranteed, paymentStatus])
+  useEffect(() => { load() }, [debouncedSearch, status, swimStyle, isGuaranteed, paymentStatus, page])
 
   const enrollments = list.content || []
-  const hasAnyFilter = Boolean(search || status || swimStyle || isGuaranteed !== '')
+  const hasAnyFilter = Boolean(search || status || swimStyle || isGuaranteed !== '' || paymentStatus)
 
   return (
     <div className="space-y-4">
@@ -83,12 +97,14 @@ export default function AdminEnrollments() {
           { label: 'Học viên', value: search, onRemove: () => setSearch('') },
           { label: 'Kiểu bơi', value: swimStyle, displayValue: STYLE[swimStyle] ? `Bơi ${STYLE[swimStyle]}` : swimStyle, onRemove: () => setSwimStyle('') },
           { label: 'Cam kết', value: isGuaranteed, displayValue: isGuaranteed === 'true' ? 'Cam kết' : isGuaranteed === 'false' ? 'Thường' : '', onRemove: () => setIsGuaranteed('') },
+          { label: 'Học phí', value: paymentStatus, displayValue: PAYMENT_STATUS_META[paymentStatus]?.label, onRemove: () => setPaymentStatus('') },
           { label: 'Trạng thái', value: status, displayValue: status === 'ACTIVE' ? 'Đang học' : status === 'COMPLETED' ? 'Hoàn thành' : status === 'EXPIRED' ? 'Hết hạn' : '', onRemove: () => setStatus('') },
         ]}
         onClearAll={() => {
           setSearch('')
           setSwimStyle('')
           setIsGuaranteed('')
+          setPaymentStatus('')
           setStatus('')
         }}
       />
@@ -107,6 +123,7 @@ export default function AdminEnrollments() {
                   setSearch('')
                   setSwimStyle('')
                   setIsGuaranteed('')
+                  setPaymentStatus('')
                   setStatus('')
                 }}
               >
@@ -159,6 +176,15 @@ export default function AdminEnrollments() {
                     <th className="px-4 py-3 font-semibold text-ink-600">Hạn</th>
                     <th className="px-4 py-3">
                       <ColumnHeaderFilter
+                        label="Học phí"
+                        type="select"
+                        value={paymentStatus}
+                        onChange={setPaymentStatus}
+                        options={PAYMENT_STATUS_OPTIONS}
+                      />
+                    </th>
+                    <th className="px-4 py-3">
+                      <ColumnHeaderFilter
                         label="Trạng thái"
                         type="select"
                         value={status}
@@ -181,6 +207,13 @@ export default function AdminEnrollments() {
                       <td className="px-4 py-3 text-ink-600 font-medium">Bơi {STYLE[e.swimStyle] || e.swimStyle}</td>
                       <td className="px-4 py-3">{e.isGuaranteed ? <Badge color="amber"><Shield className="w-3 h-3" /> Cam kết</Badge> : <Badge color="gray">Thường</Badge>}</td>
                       <td className="px-4 py-3 text-ink-600">{e.expireDate || '—'}</td>
+                      <td className="px-4 py-3">
+                        <PaymentStatusSelect
+                          value={e.paymentStatus}
+                          studentName={e.studentName}
+                          onChange={(nextStatus) => handlePaymentStatusChange(e.id, nextStatus)}
+                        />
+                      </td>
                       <td className="px-4 py-3"><Badge color={STATUS[e.status]}>{e.status === 'ACTIVE' ? 'Đang học' : e.status === 'COMPLETED' ? 'Hoàn thành' : 'Hết hạn'}</Badge></td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -266,6 +299,7 @@ function DetailModal({ id, onClose, onEdit, onReload }) {
             <Info label="Đã học" value={data.attendedSessions} />
             <Info label="Bắt đầu" value={data.startDate || '—'} />
             <Info label="Hết hạn" value={data.expireDate || '—'} />
+            <Info label="Học phí" value={<Badge color={PAYMENT_STATUS_META[data.paymentStatus]?.color || 'gray'}>{PAYMENT_STATUS_META[data.paymentStatus]?.label || 'Chưa xác nhận'}</Badge>} />
             <Info label="Trạng thái" value={<Badge color={STATUS[data.status]}>{data.status === 'ACTIVE' ? 'Đang học' : data.status === 'COMPLETED' ? 'Hoàn thành' : 'Hết hạn'}</Badge>} />
           </div>
 

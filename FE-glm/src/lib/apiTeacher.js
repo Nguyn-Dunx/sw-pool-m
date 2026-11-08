@@ -16,6 +16,7 @@ export const getMyStudents = async (params) => unwrapPage(await api.get('/teache
 export const getMyStudentDetail = async (enrollmentId) => unwrap(await api.get(`/teacher/enrollments/${enrollmentId}`))
 export const getStudentHistory = async (enrollmentId) => unwrap(await api.get(`/teacher/enrollments/${enrollmentId}/history`))
 export const completeMyEnrollment = async (enrollmentId) => unwrap(await api.put(`/teacher/enrollments/${enrollmentId}/complete`))
+export const updateMyEnrollmentPaymentStatus = async (enrollmentId, paymentStatus) => unwrap(await api.put(`/teacher/enrollments/${enrollmentId}/payment-status`, { paymentStatus }))
 export const exportTeacherStudents = (params) => api.get('/teacher/enrollments/export' + qs({ ...params, searchName: params.studentName || params.searchName }), { responseType: 'blob' })
 export const exportStudentHistory = (enrollmentId) => api.get(`/teacher/enrollments/${enrollmentId}/history/export`, { responseType: 'blob' })
 

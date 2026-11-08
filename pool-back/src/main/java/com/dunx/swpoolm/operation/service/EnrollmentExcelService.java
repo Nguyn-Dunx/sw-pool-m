@@ -6,6 +6,7 @@ import com.dunx.swpoolm.common.i18n.MessageKeys;
 import com.dunx.swpoolm.operation.entity.AttendanceRecord;
 import com.dunx.swpoolm.operation.entity.Enrollment;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
+import com.dunx.swpoolm.operation.enums.PaymentStatus;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import com.dunx.swpoolm.operation.repository.AttendanceRecordRepository;
 import com.dunx.swpoolm.operation.repository.EnrollmentRepository;
@@ -35,7 +36,7 @@ public class EnrollmentExcelService {
     private static final String[] ENROLLMENT_HEADERS = {
             "STT", "Tên học viên", "Số điện thoại", "Giáo viên phụ trách",
             "Kiểu bơi", "Loại khóa", "Số buổi quy định", "Số buổi đã học",
-            "Ngày bắt đầu", "Hạn thẻ", "Trạng thái"
+            "Ngày bắt đầu", "Hạn thẻ", "Học phí", "Trạng thái"
     };
 
     private static final String[] HISTORY_HEADERS = {
@@ -47,12 +48,12 @@ public class EnrollmentExcelService {
      */
     @Transactional(readOnly = true)
     public byte[] exportAdminEnrollments(EnrollmentStatus status, SwimStyle swimStyle, Boolean isGuaranteed,
-                                         String studentName, UUID teacherId) throws IOException {
+                                         PaymentStatus paymentStatus, String studentName, UUID teacherId) throws IOException {
         List<Enrollment> list;
         if (teacherId != null) {
-            list = enrollmentRepository.exportAllByTeacherWithFilters(teacherId, status);
+            list = enrollmentRepository.exportAllByTeacherWithFilters(teacherId, status, paymentStatus);
         } else {
-            list = enrollmentRepository.exportAllWithFilters(status, swimStyle, isGuaranteed, studentName);
+            list = enrollmentRepository.exportAllWithFilters(status, swimStyle, isGuaranteed, paymentStatus, studentName);
         }
 
         ExcelExportHelper helper = new ExcelExportHelper("Danh sách khóa học");
@@ -86,7 +87,8 @@ public class EnrollmentExcelService {
             helper.addNumberCell(row, 7, attended, isZebra);
             helper.addDateCell(row, 8, e.getStartDate(), isZebra);
             helper.addDateCell(row, 9, e.getExpireDate(), isZebra);
-            helper.addStatusCell(row, 10, statusStr);
+            helper.addTextCell(row, 10, mapPaymentStatus(e.getPaymentStatus()), isZebra, HorizontalAlignment.CENTER);
+            helper.addStatusCell(row, 11, statusStr);
         }
 
         String summary = String.format("Tổng cộng: %d khóa học (Đang học: %d | Hoàn thành: %d | Hết hạn: %d)",
@@ -102,12 +104,13 @@ public class EnrollmentExcelService {
      */
     @Transactional(readOnly = true)
     public byte[] exportTeacherStudents(UUID userId, String searchName, SwimStyle swimStyle,
-                                        EnrollmentStatus status, Boolean isGuaranteed) throws IOException {
+                                        EnrollmentStatus status, Boolean isGuaranteed,
+                                        PaymentStatus paymentStatus) throws IOException {
         Teacher teacher = teacherRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageKeys.Teacher.NOT_FOUND));
 
         List<Enrollment> list = enrollmentRepository.exportTeacherEnrollmentsWithFilters(
-                teacher.getId(), status, swimStyle, isGuaranteed, searchName);
+                teacher.getId(), status, swimStyle, isGuaranteed, paymentStatus, searchName);
 
         ExcelExportHelper helper = new ExcelExportHelper("Học viên phụ trách");
         helper.addHeaderBanner("DANH SÁCH HỌC VIÊN PHỤ TRÁCH - GIÁO VIÊN: " + teacher.getFullName().toUpperCase(), null);
@@ -140,7 +143,8 @@ public class EnrollmentExcelService {
             helper.addNumberCell(row, 7, attended, isZebra);
             helper.addDateCell(row, 8, e.getStartDate(), isZebra);
             helper.addDateCell(row, 9, e.getExpireDate(), isZebra);
-            helper.addStatusCell(row, 10, statusStr);
+            helper.addTextCell(row, 10, mapPaymentStatus(e.getPaymentStatus()), isZebra, HorizontalAlignment.CENTER);
+            helper.addStatusCell(row, 11, statusStr);
         }
 
         String summary = String.format("Tổng cộng: %d học viên (Đang học: %d | Hoàn thành: %d | Hết hạn: %d)",
@@ -206,6 +210,15 @@ public class EnrollmentExcelService {
             case ACTIVE -> "Đang học";
             case COMPLETED -> "Hoàn thành";
             case EXPIRED -> "Hết hạn";
+        };
+    }
+
+    private String mapPaymentStatus(PaymentStatus status) {
+        if (status == null) return "Chưa xác nhận";
+        return switch (status) {
+            case UNKNOWN -> "Chưa xác nhận";
+            case UNPAID -> "Chưa đóng";
+            case PAID -> "Đã đóng";
         };
     }
 }

@@ -7,6 +7,7 @@ import com.dunx.swpoolm.common.i18n.MessageService;
 import com.dunx.swpoolm.iam.security.CustomUserDetails;
 import com.dunx.swpoolm.operation.dto.*;
 import com.dunx.swpoolm.operation.enums.EnrollmentStatus;
+import com.dunx.swpoolm.operation.enums.PaymentStatus;
 import com.dunx.swpoolm.operation.enums.SwimStyle;
 import com.dunx.swpoolm.operation.service.EnrollmentService;
 import jakarta.validation.Valid;
@@ -35,11 +36,12 @@ public class EnrollmentAdminController {
             @RequestParam(required = false) EnrollmentStatus status,
             @RequestParam(required = false) SwimStyle swimStyle,
             @RequestParam(required = false) Boolean isGuaranteed,
+            @RequestParam(required = false) PaymentStatus paymentStatus,
             @RequestParam(required = false) String studentName,
             @RequestParam(required = false) UUID teacherId) throws java.io.IOException {
 
         byte[] excelBytes = enrollmentExcelService.exportAdminEnrollments(
-                status, swimStyle, isGuaranteed, studentName, teacherId);
+                status, swimStyle, isGuaranteed, paymentStatus, studentName, teacherId);
 
         String filename = "Danh_Sach_Khoa_Hoc_" + java.time.LocalDate.now() + ".xlsx";
 
@@ -55,13 +57,14 @@ public class EnrollmentAdminController {
             @RequestParam(required = false) EnrollmentStatus status,
             @RequestParam(required = false) SwimStyle swimStyle,
             @RequestParam(required = false) Boolean isGuaranteed,
+            @RequestParam(required = false) PaymentStatus paymentStatus,
             @RequestParam(required = false) String studentName,
             @RequestParam(required = false) UUID teacherId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         PageResponse<EnrollmentResponse> response = enrollmentService.getEnrollments(
-                status, swimStyle, isGuaranteed, studentName, teacherId, page, size);
+                status, swimStyle, isGuaranteed, paymentStatus, studentName, teacherId, page, size);
 
         return ResponseEntity.ok(ApiResponse.success(response, messageService.get(MessageKeys.Common.SUCCESS)));
     }
@@ -103,6 +106,16 @@ public class EnrollmentAdminController {
         enrollmentService.completeEnrollment(id);
 
         return ResponseEntity.ok(ApiResponse.success(null, messageService.get(MessageKeys.Common.SUCCESS)));
+    }
+
+    @PutMapping("/{id}/payment-status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> updatePaymentStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody PaymentStatusUpdateRequest request) {
+
+        enrollmentService.updatePaymentStatus(id, request.getPaymentStatus());
+        return ResponseEntity.ok(ApiResponse.success(null, messageService.get(MessageKeys.Common.UPDATED)));
     }
 
 }
