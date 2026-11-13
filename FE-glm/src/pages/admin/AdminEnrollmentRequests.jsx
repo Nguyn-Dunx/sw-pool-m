@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
-import { ClipboardCheck, CheckCircle, XCircle, Eye, Search, Shield, X, User } from 'lucide-react'
+import { ClipboardCheck, CheckCircle, XCircle, Eye, Shield } from 'lucide-react'
 import { getEnrollmentRequests, reviewEnrollmentRequest, getTeachers, getEnrollmentDetail, exportEnrollmentRequests } from '../../lib/apiAdmin'
-import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips, ExportButton } from '../../components/ui'
+import { Button, Badge, EmptyState, ErrorState, TableSkeleton, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips, ExportButton, IconButton, InfoTile, PageHeader } from '../../components/ui'
+import { useClientSort, SortHeader, SortScopeNote } from '../../components/ui/Sort'
+import TeacherPicker from '../../components/ui/TeacherPicker'
+import { PageTransition } from '../../components/motion/Motion'
 import { useAuth } from '../../store/auth'
 import { useRequestNotification } from '../../store/notifications'
 import { toast } from '../../components/ui/Toast'
@@ -21,6 +24,7 @@ export default function AdminEnrollmentRequests() {
   const { checkNotifications } = useRequestNotification()
   const [list, setList] = useState({ content: [], totalElements: 0, totalPages: 0, currentPage: 1, pageSize: 10 })
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [swimStyle, setSwimStyle] = useState('')
@@ -33,6 +37,7 @@ export default function AdminEnrollmentRequests() {
 
   const load = () => {
     setLoading(true)
+    setLoadError(null)
     getEnrollmentRequests({
       status: status || undefined,
       requestType: requestType || undefined,
@@ -46,7 +51,7 @@ export default function AdminEnrollmentRequests() {
         setList(res)
         checkNotifications('ADMIN', user?.id)
       })
-      .catch((e) => toast.error(errMsg(e)))
+      .catch((e) => { setLoadError(e); toast.error(errMsg(e)) })
       .finally(() => setLoading(false))
   }
 
@@ -65,19 +70,25 @@ export default function AdminEnrollmentRequests() {
   useEffect(() => { load() }, [status, requestType, debouncedSearch, swimStyle, isGuaranteed, page])
 
   const requests = list.content || []
+  const { sorted, sortKey, sortDir, toggleSort } = useClientSort(requests)
   const hasAnyFilter = Boolean(search || status || swimStyle || isGuaranteed !== '' || requestType)
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3 animate-fade-in">
-        <div>
-          <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Yêu cầu đăng ký</h1>
-          <p className="text-sm text-ink-500 mt-1">Duyệt yêu cầu tạo/cập nhật khóa học từ giáo viên — Lọc trực tiếp trên từng cột</p>
-        </div>
-        <ExportButton onExport={handleExport} />
-      </div>
+  const clearFilters = () => {
+    setSearch('')
+    setSwimStyle('')
+    setIsGuaranteed('')
+    setRequestType('')
+    setStatus('')
+  }
 
-      {/* Thanh hiển thị các bộ lọc đang kích hoạt */}
+  return (
+    <PageTransition className="space-y-4">
+      <PageHeader
+        title="Yêu cầu đăng ký"
+        description="Duyệt yêu cầu tạo/cập nhật khóa học từ giáo viên — lọc trực tiếp trên từng cột"
+        actions={<ExportButton onExport={handleExport} />}
+      />
+
       <ActiveFilterChips
         filters={[
           { label: 'Học viên', value: search, onRemove: () => setSearch('') },
@@ -86,136 +97,97 @@ export default function AdminEnrollmentRequests() {
           { label: 'Loại yêu cầu', value: requestType, displayValue: TYPE_LABEL[requestType], onRemove: () => setRequestType('') },
           { label: 'Trạng thái', value: status, displayValue: STATUS_LABEL[status], onRemove: () => setStatus('') },
         ]}
-        onClearAll={() => {
-          setSearch('')
-          setSwimStyle('')
-          setIsGuaranteed('')
-          setRequestType('')
-          setStatus('')
-        }}
+        onClearAll={clearFilters}
       />
 
-      <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-        {loading ? <Spinner className="py-20" size={32} /> : requests.length === 0 ? (
+      <div className="bg-surface rounded-2xl border border-line shadow-card overflow-hidden" data-stagger>
+        {loading ? <TableSkeleton rows={6} cols={6} className="border-0 shadow-none rounded-none" /> : loadError ? (
+          <ErrorState onRetry={load} />
+        ) : requests.length === 0 ? (
           <EmptyState
             icon={ClipboardCheck}
             title={hasAnyFilter ? 'Không tìm thấy yêu cầu phù hợp' : 'Không có yêu cầu'}
             description={hasAnyFilter ? 'Không có yêu cầu nào khớp với bộ lọc đã chọn.' : 'Chưa có yêu cầu đăng ký nào cần duyệt.'}
-            action={hasAnyFilter ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setSearch('')
-                  setSwimStyle('')
-                  setIsGuaranteed('')
-                  setRequestType('')
-                  setStatus('')
-                }}
-              >
-                Xóa tất cả bộ lọc
-              </Button>
-            ) : null}
+            action={hasAnyFilter ? <Button variant="secondary" size="sm" onClick={clearFilters}>Xóa tất cả bộ lọc</Button> : null}
           />
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-ink-50/80 text-ink-500 text-left border-b border-ink-100/60">
+                <thead className="bg-surface-muted/60 text-content-muted text-left border-b border-line">
                   <tr>
-                    <th className="px-4 py-3">
-                      <ColumnHeaderFilter
-                        label="Học viên"
-                        type="search"
-                        value={search}
-                        onChange={setSearch}
-                        placeholder="Tìm tên học viên..."
-                      />
+                    <th className="px-4 py-2">
+                      <ColumnHeaderFilter label="Học viên" type="search" value={search} onChange={setSearch} placeholder="Tìm tên học viên..." />
                     </th>
-                    <th className="px-4 py-3 font-semibold text-ink-600">GV đề xuất</th>
-                    <th className="px-4 py-3 hidden sm:table-cell">
-                      <ColumnHeaderFilter
-                        label="Kiểu bơi"
-                        type="select"
-                        value={swimStyle}
-                        onChange={setSwimStyle}
+                    <th className="px-4 py-2 font-semibold text-content-muted">GV đề xuất</th>
+                    <th className="px-4 py-2 hidden sm:table-cell">
+                      <ColumnHeaderFilter label="Kiểu bơi" type="select" value={swimStyle} onChange={setSwimStyle}
                         options={[
                           { value: 'FROG', label: 'Bơi ếch' },
                           { value: 'FREE', label: 'Bơi sải' },
                           { value: 'BACK', label: 'Bơi ngửa' },
                           { value: 'FLY', label: 'Bơi bướm' },
-                        ]}
-                      />
+                        ]} />
                     </th>
-                    <th className="px-4 py-3 hidden md:table-cell">
-                      <ColumnHeaderFilter
-                        label="Cam kết"
-                        type="select"
-                        value={isGuaranteed}
-                        onChange={setIsGuaranteed}
+                    <th className="px-4 py-2 hidden md:table-cell">
+                      <ColumnHeaderFilter label="Cam kết" type="select" value={isGuaranteed} onChange={setIsGuaranteed}
                         options={[
                           { value: 'true', label: 'Cam kết', badgeColor: 'amber' },
                           { value: 'false', label: 'Thường', badgeColor: 'gray' },
-                        ]}
-                      />
+                        ]} />
                     </th>
-                    <th className="px-4 py-3 hidden md:table-cell">
-                      <ColumnHeaderFilter
-                        label="Loại"
-                        type="select"
-                        value={requestType}
-                        onChange={setRequestType}
+                    <th className="px-4 py-2 hidden md:table-cell">
+                      <ColumnHeaderFilter label="Loại" type="select" value={requestType} onChange={setRequestType}
                         options={[
                           { value: 'CREATE', label: 'Tạo mới', badgeColor: 'blue' },
                           { value: 'UPDATE', label: 'Cập nhật', badgeColor: 'purple' },
-                        ]}
-                      />
+                        ]} />
                     </th>
-                    <th className="px-4 py-3">
-                      <ColumnHeaderFilter
-                        label="Trạng thái"
-                        type="select"
-                        value={status}
-                        onChange={setStatus}
+                    <th className="px-4 py-2">
+                      <ColumnHeaderFilter label="Trạng thái" type="select" value={status} onChange={setStatus}
                         options={[
                           { value: 'PENDING', label: 'Chờ duyệt', badgeColor: 'amber' },
                           { value: 'APPROVED', label: 'Đã duyệt', badgeColor: 'green' },
                           { value: 'REJECTED', label: 'Từ chối', badgeColor: 'red' },
-                        ]}
-                      />
+                        ]} />
                     </th>
-                    <th className="px-4 py-3 font-semibold text-ink-600 hidden sm:table-cell">Ngày tạo</th>
-                    <th className="px-4 py-3 font-semibold text-ink-600 text-right">Thao tác</th>
+                    <th className="px-4 py-2 hidden sm:table-cell" aria-sort={sortKey === 'createdAt' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                      <SortHeader label="Ngày tạo" sortKey="createdAt" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                    </th>
+                    <th className="px-4 py-2 font-semibold text-content-muted text-right">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-ink-100/60">
-                  {requests.map((r) => (
-                    <tr key={r.id} className="hover:bg-pool-50/50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-ink-800">{r.studentName}</td>
-                      <td className="px-4 py-3 text-ink-600">{r.teacherName || '—'}</td>
-                      <td className="px-4 py-3 text-ink-600 hidden sm:table-cell font-medium">Bơi {STYLE[r.swimStyle] || r.swimStyle}</td>
+                <tbody className="divide-y divide-line/70">
+                  {sorted.map((r) => (
+                    <tr key={r.id} className="hover:bg-primary-soft/30 transition-colors">
+                      <td className="px-4 py-3 font-medium text-content">{r.studentName}</td>
+                      <td className="px-4 py-3 text-content-muted">{r.teacherName || '—'}</td>
+                      <td className="px-4 py-3 text-content-muted hidden sm:table-cell font-medium">Bơi {STYLE[r.swimStyle] || r.swimStyle}</td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        {r.isGuaranteed ? (
-                          <Badge color="amber"><Shield className="w-3 h-3" /> Cam kết</Badge>
-                        ) : (
-                          <Badge color="gray">Thường</Badge>
-                        )}
+                        {r.isGuaranteed ? <Badge color="amber"><Shield className="w-3 h-3" aria-hidden="true" /> Cam kết</Badge> : <Badge color="gray">Thường</Badge>}
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell"><Badge color={r.requestType === 'CREATE' ? 'blue' : 'purple'}>{TYPE_LABEL[r.requestType] || r.requestType}</Badge></td>
                       <td className="px-4 py-3"><Badge color={STATUS_COLOR[r.status]}>{STATUS_LABEL[r.status]}</Badge></td>
-                      <td className="px-4 py-3 text-ink-500 hidden sm:table-cell">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '—'}</td>
+                      <td className="px-4 py-3 text-content-muted hidden sm:table-cell whitespace-nowrap">{formatDisplayDate(r.createdAt)}</td>
                       <td className="px-4 py-3 text-right">
-                        <Button size="sm" variant={r.status === 'PENDING' ? 'primary' : 'outline'} onClick={() => setReview(r)}>
-                          {r.status === 'PENDING' ? 'Duyệt' : <Eye className="w-4 h-4" />}
-                        </Button>
+                        {r.status === 'PENDING' ? (
+                          <Button size="sm" onClick={() => setReview(r)}>Duyệt</Button>
+                        ) : (
+                          <IconButton label={`Xem yêu cầu của ${r.studentName}`} tone="neutral" onClick={() => setReview(r)}>
+                            <Eye className="w-4 h-4" aria-hidden="true" />
+                          </IconButton>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="p-4 border-t border-ink-100/60">
-              <p className="text-xs text-ink-400 mb-3">Tổng {list.totalElements || 0} yêu cầu</p>
+            <div className="p-4 border-t border-line">
+              <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                <p className="text-xs text-content-subtle">Tổng {list.totalElements || 0} yêu cầu</p>
+                <SortScopeNote active={Boolean(sortKey)} />
+              </div>
               <Pagination page={list.currentPage} totalPages={list.totalPages} onChange={setPage} />
             </div>
           </>
@@ -223,7 +195,7 @@ export default function AdminEnrollmentRequests() {
       </div>
 
       {review && <ReviewModal request={review} onClose={() => setReview(null)} onDone={() => { setReview(null); load() }} />}
-    </div>
+    </PageTransition>
   )
 }
 
@@ -237,10 +209,6 @@ function ReviewModal({ request, onClose, onDone }) {
   const defaultQuotaStr = request.totalQuota ? String(request.totalQuota) : String(defaultQuota || 12)
 
   const [allTeachers, setAllTeachers] = useState([])
-  const [teacherSearch, setTeacherSearch] = useState('')
-  const [showTeacherDropdown, setShowTeacherDropdown] = useState(false)
-  const debouncedTeacherSearch = useDebounce(teacherSearch, 250)
-
   const [form, setForm] = useState({
     status: 'APPROVED',
     adminNote: request.adminNote || '',
@@ -249,20 +217,20 @@ function ReviewModal({ request, onClose, onDone }) {
     expireDate: defaultExpire,
     teacherIds: []
   })
-  const [selectedTeachers, setSelectedTeachers] = useState([]) // [{id, fullName}]
+  const [selectedTeachers, setSelectedTeachers] = useState([])
+  const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
 
-  // Load all teachers for combobox
+  // Tải danh sách giáo viên để khởi tạo tag (CREATE/UPDATE)
   useEffect(() => {
-    getTeachers({ keyword: debouncedTeacherSearch, page: 1, size: 50 })
+    getTeachers({ keyword: '', page: 1, size: 50 })
       .then((r) => setAllTeachers(r.content || []))
       .catch(() => setAllTeachers([]))
-  }, [debouncedTeacherSearch])
+  }, [])
 
-  // Initialize teacher tags
+  // Khởi tạo giáo viên phụ trách theo loại yêu cầu
   useEffect(() => {
     if (request.requestType === 'CREATE') {
-      // For CREATE: pre-tag proposing teacher
       if (allTeachers.length > 0) {
         const proposing = allTeachers.find(
           t => (request.teacherId && t.id === request.teacherId) || (request.teacherName && t.fullName === request.teacherName)
@@ -277,18 +245,15 @@ function ReviewModal({ request, onClose, onDone }) {
         }
       }
     } else if (request.requestType === 'UPDATE' && request.targetEnrollmentId) {
-      // For UPDATE: load target enrollment's current teachers
       getEnrollmentDetail(request.targetEnrollmentId)
         .then((detail) => {
           let currentTeachers = (detail.teacherIds || []).map((tid, idx) => ({
             id: tid,
             fullName: detail.teacherNames?.[idx] || ''
           }))
-
           if (currentTeachers.length === 0 && detail.teacherNames?.length > 0 && allTeachers.length > 0) {
             currentTeachers = allTeachers.filter(at => detail.teacherNames.includes(at.fullName))
           }
-
           if (currentTeachers.length > 0) {
             setSelectedTeachers(currentTeachers)
             setForm(f => ({ ...f, teacherIds: currentTeachers.map(t => t.id).filter(Boolean) }))
@@ -298,39 +263,23 @@ function ReviewModal({ request, onClose, onDone }) {
     }
   }, [request, allTeachers])
 
-  const addTeacher = (teacher) => {
-    if (!selectedTeachers.find(t => t.id === teacher.id)) {
-      setSelectedTeachers(prev => [...prev, teacher])
-      setForm(f => ({ ...f, teacherIds: [...f.teacherIds, teacher.id] }))
-    }
-    setTeacherSearch('')
-    setShowTeacherDropdown(false)
+  const handleTeachersChange = (next) => {
+    setSelectedTeachers(next)
+    setForm(f => ({ ...f, teacherIds: next.map(t => t.id).filter(id => id && id !== 'proposing-teacher') }))
+    if (next.length > 0) setErrors(er => ({ ...er, teacherIds: undefined }))
   }
-
-  const removeTeacher = (id) => {
-    setSelectedTeachers(prev => prev.filter(t => t.id !== id))
-    setForm(f => ({ ...f, teacherIds: f.teacherIds.filter(tid => tid !== id) }))
-  }
-
-  // Filter out already-selected teachers
-  const filteredTeachers = allTeachers.filter(t => !selectedTeachers.find(st => st.id === t.id))
 
   const submit = async (e) => {
     e.preventDefault()
+    const next = {}
     if (form.status === 'APPROVED') {
-      if (form.teacherIds.length === 0 && request.requestType === 'CREATE') {
-        toast.error('Vui lòng chọn ít nhất một giáo viên phụ trách')
-        return
-      }
-      if (form.startDate && form.expireDate && new Date(form.startDate) >= new Date(form.expireDate)) {
-        toast.error('Ngày hết hạn phải sau ngày bắt đầu')
-        return
-      }
-      if (form.totalQuota && Number(form.totalQuota) < 1) {
-        toast.error('Tổng buổi phải lớn hơn 0')
-        return
-      }
+      if (form.teacherIds.length === 0 && request.requestType === 'CREATE') next.teacherIds = 'Vui lòng chọn ít nhất một giáo viên phụ trách'
+      if (form.startDate && form.expireDate && new Date(form.startDate) >= new Date(form.expireDate)) next.expireDate = 'Ngày hết hạn phải sau ngày bắt đầu'
+      if (form.totalQuota && Number(form.totalQuota) < 1) next.totalQuota = 'Tổng buổi phải lớn hơn 0'
     }
+    setErrors(next)
+    if (Object.keys(next).length > 0) return
+
     setLoading(true)
     try {
       const body = {
@@ -348,49 +297,57 @@ function ReviewModal({ request, onClose, onDone }) {
   }
 
   return (
-    <Modal open onClose={onClose} title={isPending ? `Duyệt yêu cầu` : `Chi tiết yêu cầu`} size="lg">
+    <Modal open onClose={onClose} title={isPending ? 'Duyệt yêu cầu' : 'Chi tiết yêu cầu'} size="lg">
       <div className="space-y-5">
-        {/* Request info header */}
-        <div className="bg-ink-50/60 rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-ink-900 text-lg">{request.studentName}</h3>
+        <div className="bg-surface-muted/60 rounded-xl p-4 space-y-3 border border-line">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="font-display font-semibold text-content text-lg">{request.studentName}</h3>
             <div className="flex items-center gap-2">
               <Badge color={request.requestType === 'CREATE' ? 'blue' : 'purple'}>{TYPE_LABEL[request.requestType]}</Badge>
               <Badge color={STATUS_COLOR[request.status]}>{STATUS_LABEL[request.status]}</Badge>
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-            <InfoItem label="GV đề xuất" value={request.teacherName || '—'} />
-            <InfoItem label="Kiểu bơi" value={STYLE[request.swimStyle] || request.swimStyle || '—'} />
-            <InfoItem label="Cam kết" value={request.isGuaranteed ? 'Có cam kết' : 'Không'} />
-            <InfoItem label="Tổng buổi" value={`${defaultQuota} buổi ${request.totalQuota ? '' : '(mặc định)'}`} />
-            <InfoItem label="Ngày bắt đầu" value={`${formatDisplayDate(defaultStart)} ${request.startDate ? '' : '(mặc định)'}`} />
-            <InfoItem label="Ngày hết hạn" value={`${formatDisplayDate(defaultExpire)} ${request.expireDate ? '' : '(mặc định)'}`} />
+            <InfoTile label="GV đề xuất">{request.teacherName || '—'}</InfoTile>
+            <InfoTile label="Kiểu bơi">Bơi {STYLE[request.swimStyle] || request.swimStyle || '—'}</InfoTile>
+            <InfoTile label="Cam kết">{request.isGuaranteed ? 'Có cam kết' : 'Không'}</InfoTile>
+            <InfoTile label="Tổng buổi">{defaultQuota} buổi {request.totalQuota ? '' : '(mặc định)'}</InfoTile>
+            <InfoTile label="Ngày bắt đầu">{formatDisplayDate(defaultStart)} {request.startDate ? '' : '(mặc định)'}</InfoTile>
+            <InfoTile label="Ngày hết hạn">{formatDisplayDate(defaultExpire)} {request.expireDate ? '' : '(mặc định)'}</InfoTile>
           </div>
           {request.note && (
             <div className="pt-1">
-              <p className="text-xs text-ink-400">Ghi chú GV</p>
-              <p className="text-sm text-ink-700 bg-white/80 rounded-lg px-3 py-2 mt-1">{request.note}</p>
+              <p className="text-xs text-content-subtle">Ghi chú GV</p>
+              <p className="text-sm text-content bg-surface rounded-lg px-3 py-2 mt-1 border border-line">{request.note}</p>
             </div>
           )}
           {request.adminNote && !isPending && (
             <div className="pt-1">
-              <p className="text-xs text-ink-400">Ghi chú Admin</p>
-              <p className="text-sm text-ink-700 bg-white/80 rounded-lg px-3 py-2 mt-1">{request.adminNote}</p>
+              <p className="text-xs text-content-subtle">Ghi chú Admin</p>
+              <p className="text-sm text-content bg-surface rounded-lg px-3 py-2 mt-1 border border-line">{request.adminNote}</p>
             </div>
           )}
         </div>
 
-        {/* Only show review form for PENDING requests */}
         {isPending ? (
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={submit} className="space-y-4" noValidate>
             <Field label="Quyết định" required>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setForm({ ...form, status: 'APPROVED' })} className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${form.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
-                  <CheckCircle className="w-4 h-4 inline mr-1.5" /> Duyệt
+              <div className="flex gap-2" role="group" aria-label="Quyết định duyệt yêu cầu">
+                <button
+                  type="button"
+                  aria-pressed={form.status === 'APPROVED'}
+                  onClick={() => setForm({ ...form, status: 'APPROVED' })}
+                  className={`flex-1 min-h-11 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all inline-flex items-center justify-center gap-1.5 ${form.status === 'APPROVED' ? 'bg-success-soft border-success/40 text-success-text shadow-sm' : 'border-line text-content-muted hover:bg-surface-muted'}`}
+                >
+                  <CheckCircle className="w-4 h-4" aria-hidden="true" /> Duyệt
                 </button>
-                <button type="button" onClick={() => setForm({ ...form, status: 'REJECTED' })} className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${form.status === 'REJECTED' ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-sm' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
-                  <XCircle className="w-4 h-4 inline mr-1.5" /> Từ chối
+                <button
+                  type="button"
+                  aria-pressed={form.status === 'REJECTED'}
+                  onClick={() => setForm({ ...form, status: 'REJECTED' })}
+                  className={`flex-1 min-h-11 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all inline-flex items-center justify-center gap-1.5 ${form.status === 'REJECTED' ? 'bg-danger-soft border-danger/40 text-danger-text shadow-sm' : 'border-line text-content-muted hover:bg-surface-muted'}`}
+                >
+                  <XCircle className="w-4 h-4" aria-hidden="true" /> Từ chối
                 </button>
               </div>
             </Field>
@@ -402,8 +359,8 @@ function ReviewModal({ request, onClose, onDone }) {
             {form.status === 'APPROVED' && (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Field label="Tổng buổi" hint={`Mặc định: ${defaultQuota} buổi`}>
-                    <input type="number" min="1" value={form.totalQuota} onChange={(e) => setForm({ ...form, totalQuota: e.target.value })} className={inputCls} placeholder={String(defaultQuota)} />
+                  <Field label="Tổng buổi" hint={`Mặc định: ${defaultQuota} buổi`} error={errors.totalQuota}>
+                    <input type="number" min="1" value={form.totalQuota} onChange={(e) => { setForm({ ...form, totalQuota: e.target.value }); if (errors.totalQuota) setErrors({ ...errors, totalQuota: undefined }) }} className={inputCls} placeholder={String(defaultQuota)} />
                   </Field>
                   <Field label="Ngày bắt đầu" hint="Mặc định: Hôm nay">
                     <input
@@ -411,70 +368,31 @@ function ReviewModal({ request, onClose, onDone }) {
                       value={form.startDate}
                       onChange={(e) => {
                         const val = e.target.value
-                        setForm(f => ({
-                          ...f,
-                          startDate: val,
-                          expireDate: val ? addDays(val, durationDays) : f.expireDate
-                        }))
+                        setForm(f => ({ ...f, startDate: val, expireDate: val ? addDays(val, durationDays) : f.expireDate }))
+                        if (errors.expireDate) setErrors(er => ({ ...er, expireDate: undefined }))
                       }}
                       className={inputCls}
                     />
                   </Field>
-                  <Field label="Ngày hết hạn" hint={`Mặc định: +${durationDays} ngày`}>
-                    <input type="date" value={form.expireDate} min={form.startDate || undefined} onChange={(e) => setForm({ ...form, expireDate: e.target.value })} className={inputCls} />
+                  <Field label="Ngày hết hạn" hint={`Mặc định: +${durationDays} ngày`} error={errors.expireDate}>
+                    <input type="date" value={form.expireDate} min={form.startDate || undefined} onChange={(e) => { setForm({ ...form, expireDate: e.target.value }); if (errors.expireDate) setErrors({ ...errors, expireDate: undefined }) }} className={inputCls} />
                   </Field>
                 </div>
 
-                <Field label="Giáo viên phụ trách" required={request.requestType === 'CREATE'} hint={request.requestType === 'UPDATE' ? 'Tag giáo viên hiện tại (thêm hoặc bấm X để xóa)' : 'Tag sẵn GV gửi yêu cầu (thêm hoặc bấm X để xóa)'}>
-                  {/* Selected teachers tags */}
-                  {selectedTeachers.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {selectedTeachers.map(t => (
-                        <span key={t.id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-pool-50 text-pool-700 text-sm font-medium border border-pool-200">
-                          {t.fullName}
-                          <button type="button" onClick={() => removeTeacher(t.id)} className="p-0.5 rounded hover:bg-pool-100 transition-colors">
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Searchable combobox */}
-                  <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
-                    <input
-                      placeholder="Tìm thêm giáo viên theo tên..."
-                      value={teacherSearch}
-                      onChange={(e) => { setTeacherSearch(e.target.value); setShowTeacherDropdown(true) }}
-                      onFocus={() => setShowTeacherDropdown(true)}
-                      className={inputCls + ' pl-10'}
-                    />
-                    {showTeacherDropdown && (
-                      <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-ink-200 rounded-xl shadow-xl max-h-40 overflow-y-auto">
-                        {filteredTeachers.length === 0 ? (
-                          <p className="text-sm text-ink-400 py-3 text-center">Không tìm thấy</p>
-                        ) : (
-                          filteredTeachers.map(t => (
-                            <button type="button" key={t.id} onClick={() => addTeacher(t)} className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-pool-50/50 transition-colors text-left border-b border-ink-100/40 last:border-0">
-                              <div>
-                                <p className="text-sm font-medium text-ink-800">{t.fullName}</p>
-                                <p className="text-xs text-ink-400">{t.phoneNumber} {t.specialty ? `• ${t.specialty}` : ''}</p>
-                              </div>
-                              <Badge color={t.status === 'ACTIVE' ? 'green' : 'gray'}>{t.status === 'ACTIVE' ? 'Đang dạy' : t.status}</Badge>
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </Field>
+                <TeacherPicker
+                  selected={selectedTeachers}
+                  onChange={handleTeachersChange}
+                  required={request.requestType === 'CREATE'}
+                  hint={request.requestType === 'UPDATE' ? 'Tag giáo viên hiện tại (thêm hoặc bấm X để xóa)' : 'Tag sẵn GV gửi yêu cầu (thêm hoặc bấm X để xóa)'}
+                  error={errors.teacherIds}
+                  placeholder="Tìm thêm giáo viên theo tên..."
+                />
               </>
             )}
 
             <div className="flex gap-3 pt-2">
               <Button type="button" variant="outline" onClick={onClose} className="flex-1">Hủy</Button>
-              <Button type="submit" disabled={loading} variant={form.status === 'REJECTED' ? 'danger' : 'primary'} className="flex-1">
+              <Button type="submit" loading={loading} variant={form.status === 'REJECTED' ? 'danger' : 'primary'} className="flex-1">
                 {loading ? 'Đang xử lý...' : form.status === 'APPROVED' ? 'Xác nhận duyệt' : 'Xác nhận từ chối'}
               </Button>
             </div>
@@ -486,14 +404,5 @@ function ReviewModal({ request, onClose, onDone }) {
         )}
       </div>
     </Modal>
-  )
-}
-
-function InfoItem({ label, value }) {
-  return (
-    <div>
-      <p className="text-xs text-ink-400">{label}</p>
-      <p className="font-medium text-ink-800">{value}</p>
-    </div>
   )
 }

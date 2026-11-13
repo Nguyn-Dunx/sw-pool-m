@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ListChecks, Plus, Search, UserPlus, Users, Shield, Info, Eye, CheckCircle } from 'lucide-react'
 import { getMyEnrollmentRequests, createEnrollmentRequest, getTeacherStudents, createTeacherStudent, getMyStudents, exportTeacherRequests } from '../../lib/apiTeacher'
-import { Button, Badge, Spinner, EmptyState, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips, ExportButton } from '../../components/ui'
+import { Button, Badge, Spinner, EmptyState, ErrorState, TableSkeleton, Pagination, Modal, Field, inputCls, ColumnHeaderFilter, ActiveFilterChips, ExportButton, InfoTile, PageHeader } from '../../components/ui'
+import { useClientSort, SortHeader, SortScopeNote } from '../../components/ui/Sort'
+import { PageTransition } from '../../components/motion/Motion'
 import { useAuth } from '../../store/auth'
 import { useRequestNotification } from '../../store/notifications'
 import { toast } from '../../components/ui/Toast'
@@ -22,6 +24,7 @@ export default function TeacherRequests() {
   const { isRequestUnseen, markSingleRequestSeen, markAllTeacherRequestsSeen, teacherNewResponseCount } = useRequestNotification()
   const [list, setList] = useState({ content: [], totalElements: 0, totalPages: 0, currentPage: 1, pageSize: 10 })
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [status, setStatus] = useState('')
   const [requestType, setRequestType] = useState('')
   const [page, setPage] = useState(1)
@@ -30,19 +33,15 @@ export default function TeacherRequests() {
 
   const load = () => {
     setLoading(true)
+    setLoadError(null)
     getMyEnrollmentRequests({ requestType: requestType || undefined, status: status || undefined, page, size: 10 })
-      .then((res) => {
-        setList(res)
-      })
-      .catch((e) => toast.error(errMsg(e)))
+      .then((res) => setList(res))
+      .catch((e) => { setLoadError(e); toast.error(errMsg(e)) })
       .finally(() => setLoading(false))
   }
 
   const handleExport = () => downloadFile(
-    () => exportTeacherRequests({
-      requestType: requestType || undefined,
-      status: status || undefined
-    }),
+    () => exportTeacherRequests({ requestType: requestType || undefined, status: status || undefined }),
     `Yeu_Cau_Cua_Toi_${getTodayDate()}.xlsx`
   )
 
@@ -50,141 +49,100 @@ export default function TeacherRequests() {
   useEffect(() => { load() }, [status, requestType, page])
 
   const requests = list.content || []
+  const { sorted, sortKey, sortDir, toggleSort } = useClientSort(requests)
   const hasAnyFilter = Boolean(status || requestType)
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3 animate-fade-in">
-        <div>
-          <h1 className="text-2xl font-bold text-ink-900 tracking-tight">Yêu cầu đăng ký</h1>
-          <p className="text-sm text-ink-500 mt-1">Gửi yêu cầu tạo/cập nhật khóa học cho Admin duyệt — Lọc trực tiếp trên từng cột</p>
-        </div>
-        <div className="flex items-center gap-2">
+    <PageTransition className="space-y-4">
+      <PageHeader
+        title="Yêu cầu đăng ký"
+        description="Gửi yêu cầu tạo/cập nhật khóa học cho Admin duyệt — lọc trực tiếp trên từng cột"
+        actions={<>
           {teacherNewResponseCount > 0 && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => markAllTeacherRequestsSeen(user?.id, list.content)}
-              title="Đánh dấu tất cả phản hồi hiện tại là đã xem"
-            >
-              <CheckCircle className="w-4 h-4 text-emerald-600" />
+            <Button variant="secondary" size="sm" onClick={() => markAllTeacherRequestsSeen(user?.id, list.content)} title="Đánh dấu tất cả phản hồi hiện tại là đã xem">
+              <CheckCircle className="w-4 h-4 text-success-text" aria-hidden="true" />
               Đánh dấu đã xem tất cả ({teacherNewResponseCount})
             </Button>
           )}
           <ExportButton onExport={handleExport} />
-          <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" /> Tạo yêu cầu</Button>
-        </div>
-      </div>
+          <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" aria-hidden="true" /> Tạo yêu cầu</Button>
+        </>}
+      />
 
-      {/* Thanh hiển thị các bộ lọc đang kích hoạt */}
       <ActiveFilterChips
         filters={[
           { label: 'Loại yêu cầu', value: requestType, displayValue: TYPE_LABEL[requestType], onRemove: () => setRequestType('') },
           { label: 'Trạng thái', value: status, displayValue: STATUS_LABEL[status], onRemove: () => setStatus('') },
         ]}
-        onClearAll={() => {
-          setStatus('')
-          setRequestType('')
-        }}
+        onClearAll={() => { setStatus(''); setRequestType('') }}
       />
 
-      <div className="bg-white rounded-2xl border border-ink-100/60 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-        {loading ? <Spinner className="py-20" size={32} /> : requests.length === 0 ? (
+      <div className="bg-surface rounded-2xl border border-line shadow-card overflow-hidden" data-stagger>
+        {loading ? <TableSkeleton rows={6} cols={5} className="border-0 shadow-none rounded-none" /> : loadError ? (
+          <ErrorState onRetry={load} />
+        ) : requests.length === 0 ? (
           <EmptyState
             icon={ListChecks}
             title={hasAnyFilter ? 'Không tìm thấy yêu cầu phù hợp' : 'Chưa có yêu cầu'}
             description={hasAnyFilter ? 'Không có yêu cầu nào khớp với bộ lọc đã chọn.' : 'Tạo yêu cầu đăng ký khóa học đầu tiên.'}
-            action={hasAnyFilter ? (
-              <Button variant="secondary" size="sm" onClick={() => { setStatus(''); setRequestType('') }}>
-                Xóa tất cả bộ lọc
-              </Button>
-            ) : null}
+            action={hasAnyFilter ? <Button variant="secondary" size="sm" onClick={() => { setStatus(''); setRequestType('') }}>Xóa tất cả bộ lọc</Button> : null}
           />
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-ink-50/80 text-ink-500 text-left border-b border-ink-100/60">
+                <thead className="bg-surface-muted/60 text-content-muted text-left border-b border-line">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-ink-600">Học viên</th>
-                    <th className="px-4 py-3 font-semibold text-ink-600 hidden sm:table-cell">Kiểu bơi</th>
-                    <th className="px-4 py-3 hidden md:table-cell">
-                      <ColumnHeaderFilter
-                        label="Loại"
-                        type="select"
-                        value={requestType}
-                        onChange={setRequestType}
+                    <th className="px-4 py-2 font-semibold text-content-muted">Học viên</th>
+                    <th className="px-4 py-2 font-semibold text-content-muted hidden sm:table-cell">Kiểu bơi</th>
+                    <th className="px-4 py-2 hidden md:table-cell">
+                      <ColumnHeaderFilter label="Loại" type="select" value={requestType} onChange={setRequestType}
                         options={[
                           { value: 'CREATE', label: 'Tạo mới', badgeColor: 'blue' },
                           { value: 'UPDATE', label: 'Cập nhật', badgeColor: 'purple' },
-                        ]}
-                      />
+                        ]} />
                     </th>
-                    <th className="px-4 py-3">
-                      <ColumnHeaderFilter
-                        label="Trạng thái"
-                        type="select"
-                        value={status}
-                        onChange={setStatus}
+                    <th className="px-4 py-2">
+                      <ColumnHeaderFilter label="Trạng thái" type="select" value={status} onChange={setStatus}
                         options={[
                           { value: 'PENDING', label: 'Chờ duyệt', badgeColor: 'amber' },
                           { value: 'APPROVED', label: 'Đã duyệt', badgeColor: 'green' },
                           { value: 'REJECTED', label: 'Từ chối', badgeColor: 'red' },
-                        ]}
-                      />
+                        ]} />
                     </th>
-                    <th className="px-4 py-3 font-semibold text-ink-600 hidden md:table-cell">Ghi chú Admin</th>
-                    <th className="px-4 py-3 font-semibold text-ink-600 hidden sm:table-cell">Ngày tạo</th>
-                    <th className="px-4 py-3 font-semibold text-ink-600 text-right">Thao tác</th>
+                    <th className="px-4 py-2 font-semibold text-content-muted hidden md:table-cell">Ghi chú Admin</th>
+                    <th className="px-4 py-2 hidden sm:table-cell" aria-sort={sortKey === 'createdAt' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                      <SortHeader label="Ngày tạo" sortKey="createdAt" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                    </th>
+                    <th className="px-4 py-2 font-semibold text-content-muted text-right">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-ink-100/60">
-                  {requests.map((r) => {
+                <tbody className="divide-y divide-line/70">
+                  {sorted.map((r) => {
                     const isUnseen = isRequestUnseen(user?.id, r)
-
                     return (
-                      <tr
-                        key={r.id}
-                        className={`transition-colors ${
-                          isUnseen
-                            ? 'bg-rose-50/40 hover:bg-rose-50/70'
-                            : 'hover:bg-pool-50/50'
-                        }`}
-                      >
-                        <td className="px-4 py-3 font-medium text-ink-800">
+                      <tr key={r.id} className={`transition-colors ${isUnseen ? 'bg-danger-soft/40 hover:bg-danger-soft/60' : 'hover:bg-primary-soft/30'}`}>
+                        <td className="px-4 py-3 font-medium text-content">
                           <div className="flex items-center gap-2">
-                            {isUnseen && (
-                              <span className="flex h-2.5 w-2.5 relative shrink-0" title="Phản hồi mới chưa xem">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
-                              </span>
-                            )}
+                            {isUnseen && <span className="h-2.5 w-2.5 rounded-full bg-danger shrink-0" title="Phản hồi mới chưa xem" aria-hidden="true" />}
                             <span>{r.studentName || '—'}</span>
-                            {isUnseen && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 tracking-tight">
-                                Mới
-                              </span>
-                            )}
+                            {isUnseen && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-danger-soft text-danger-text tracking-tight">Mới</span>}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-ink-600 hidden sm:table-cell font-medium">Bơi {STYLE[r.swimStyle] || '—'}</td>
+                        <td className="px-4 py-3 text-content-muted hidden sm:table-cell font-medium">Bơi {STYLE[r.swimStyle] || '—'}</td>
                         <td className="px-4 py-3 hidden md:table-cell"><Badge color={r.requestType === 'CREATE' ? 'blue' : 'purple'}>{TYPE_LABEL[r.requestType] || r.requestType}</Badge></td>
                         <td className="px-4 py-3"><Badge color={STATUS_COLOR[r.status]}>{STATUS_LABEL[r.status]}</Badge></td>
-                        <td className="px-4 py-3 text-ink-500 hidden md:table-cell max-w-[200px] truncate">{r.adminNote || '—'}</td>
-                        <td className="px-4 py-3 text-ink-500 hidden sm:table-cell">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '—'}</td>
+                        <td className="px-4 py-3 text-content-muted hidden md:table-cell max-w-[200px] truncate" title={r.adminNote || ''}>{r.adminNote || '—'}</td>
+                        <td className="px-4 py-3 text-content-muted hidden sm:table-cell whitespace-nowrap">{formatDisplayDate(r.createdAt)}</td>
                         <td className="px-4 py-3 text-right">
                           <button
-                            onClick={() => {
-                              setDetail(r)
-                              markSingleRequestSeen(user?.id, r)
-                            }}
-                            className="relative p-1.5 rounded-lg text-pool-600 hover:bg-pool-50 transition-colors"
+                            onClick={() => { setDetail(r); markSingleRequestSeen(user?.id, r) }}
+                            aria-label={`Xem chi tiết yêu cầu của ${r.studentName || 'học viên'}${isUnseen ? ' (phản hồi mới)' : ''}`}
                             title="Xem chi tiết (Xóa thông báo mới)"
+                            className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl text-primary-soft-text hover:bg-primary-soft transition-all duration-150 active:scale-95"
                           >
-                            <Eye className="w-4 h-4" />
-                            {isUnseen && (
-                              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
-                            )}
+                            <Eye className="w-4 h-4" aria-hidden="true" />
+                            {isUnseen && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger ring-2 ring-surface" aria-hidden="true" />}
                           </button>
                         </td>
                       </tr>
@@ -193,8 +151,11 @@ export default function TeacherRequests() {
                 </tbody>
               </table>
             </div>
-            <div className="p-4 border-t border-ink-100/60">
-              <p className="text-xs text-ink-400 mb-3">Tổng {list.totalElements || 0} yêu cầu</p>
+            <div className="p-4 border-t border-line">
+              <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                <p className="text-xs text-content-subtle">Tổng {list.totalElements || 0} yêu cầu</p>
+                <SortScopeNote active={Boolean(sortKey)} />
+              </div>
               <Pagination page={list.currentPage} totalPages={list.totalPages} onChange={setPage} />
             </div>
           </>
@@ -202,9 +163,8 @@ export default function TeacherRequests() {
       </div>
 
       {showCreate && <CreateRequestModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />}
-
       {detail && <DetailModal request={detail} onClose={() => setDetail(null)} />}
-    </div>
+    </PageTransition>
   )
 }
 
@@ -223,27 +183,24 @@ function CreateRequestModal({ onClose, onCreated }) {
     expireDate: addDays(getTodayDate(), durationDays),
     note: ''
   })
+  const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [resolvingStudentId, setResolvingStudentId] = useState(false)
 
-  // Student selection mode for CREATE
-  const [studentMode, setStudentMode] = useState('existing') // 'existing' | 'new'
+  const [studentMode, setStudentMode] = useState('existing')
   const [newStudent, setNewStudent] = useState({ fullName: '', phoneNumber: '', dob: '' })
 
-  // My enrollments search (teacher's own students only via /teacher/enrollments)
   const [studentSearch, setStudentSearch] = useState('')
   const [myEnrollments, setMyEnrollments] = useState([])
   const [studentsLoading, setStudentsLoading] = useState(false)
   const debouncedStudentSearch = useDebounce(studentSearch, 300)
 
-  // For UPDATE
   const [selectedEnrollment, setSelectedEnrollment] = useState(null)
   const [updateStudentSearch, setUpdateStudentSearch] = useState('')
   const debouncedUpdateSearch = useDebounce(updateStudentSearch, 300)
   const [updateEnrollments, setUpdateEnrollments] = useState([])
   const [updateLoading, setUpdateLoading] = useState(false)
 
-  // Unique student list from enrollments (for CREATE "existing" mode)
   const uniqueStudents = (() => {
     const map = new Map()
     myEnrollments.forEach(en => {
@@ -254,7 +211,6 @@ function CreateRequestModal({ onClose, onCreated }) {
     return Array.from(map.values())
   })()
 
-  // Load my enrollments for CREATE existing mode (search by student name)
   useEffect(() => {
     if (requestType === 'CREATE' && studentMode === 'existing') {
       setStudentsLoading(true)
@@ -265,7 +221,6 @@ function CreateRequestModal({ onClose, onCreated }) {
     }
   }, [debouncedStudentSearch, requestType, studentMode])
 
-  // Load my enrollments for UPDATE mode (search by student name)
   useEffect(() => {
     if (requestType === 'UPDATE') {
       setUpdateLoading(true)
@@ -276,9 +231,9 @@ function CreateRequestModal({ onClose, onCreated }) {
     }
   }, [debouncedUpdateSearch, requestType])
 
-  // When selecting an existing student in CREATE mode: resolve their UUID via getTeacherStudents
   const handleSelectExistingStudent = async (student) => {
     setForm(f => ({ ...f, selectedStudentName: student.studentName, studentId: '' }))
+    setErrors(er => ({ ...er, student: undefined }))
     setResolvingStudentId(true)
     try {
       const res = await getTeacherStudents({ keyword: student.studentPhone || student.studentName, page: 1, size: 10 })
@@ -295,7 +250,6 @@ function CreateRequestModal({ onClose, onCreated }) {
     }
   }
 
-  // Sync default values when dynamic settings load
   useEffect(() => {
     if (requestType === 'CREATE') {
       setForm(f => ({
@@ -306,9 +260,9 @@ function CreateRequestModal({ onClose, onCreated }) {
     }
   }, [durationDays, defaultQuota, requestType])
 
-  // When selecting an enrollment in UPDATE mode, pre-fill form with current data
   const handleSelectEnrollment = (en) => {
     setSelectedEnrollment(en)
+    setErrors(er => ({ ...er, targetEnrollmentId: undefined }))
     const sDate = en.startDate || getTodayDate()
     const eDate = en.expireDate || addDays(sDate, durationDays)
     setForm(f => ({
@@ -324,75 +278,38 @@ function CreateRequestModal({ onClose, onCreated }) {
 
   const submit = async (e) => {
     e.preventDefault()
+    const next = {}
 
-    // Validate
     if (requestType === 'CREATE') {
       if (studentMode === 'existing') {
-        if (!form.selectedStudentName) {
-          toast.error('Vui lòng chọn học viên')
-          return
-        }
-        if (!form.studentId) {
-          toast.error('Đang tải ID học viên hoặc chưa tìm thấy ID, vui lòng thử chọn lại')
-          return
-        }
+        if (!form.selectedStudentName) next.student = 'Vui lòng chọn học viên'
+        else if (!form.studentId) next.student = 'Đang tải ID học viên hoặc chưa tìm thấy ID, vui lòng thử chọn lại'
       }
       if (studentMode === 'new') {
         const trimmedFullName = newStudent.fullName.trim()
-        if (!trimmedFullName) {
-          toast.error('Vui lòng nhập họ tên học viên')
-          return
-        }
-        if (trimmedFullName.length > 100) {
-          toast.error('Họ tên không được vượt quá 100 ký tự')
-          return
-        }
+        if (!trimmedFullName) next.newFullName = 'Vui lòng nhập họ tên học viên'
+        else if (trimmedFullName.length > 100) next.newFullName = 'Họ tên không được vượt quá 100 ký tự'
         const trimmedPhone = newStudent.phoneNumber.trim()
-        if (!trimmedPhone) {
-          toast.error('Vui lòng nhập số điện thoại')
-          return
-        }
         const phoneRegex = /^(0|\+84)[3|5|7|8|9][0-9]{8}$/
-        if (!phoneRegex.test(trimmedPhone)) {
-          toast.error('Số điện thoại không hợp lệ (10 chữ số, ví dụ 0912345678 hoặc +84912345678)')
-          return
-        }
-        if (!newStudent.dob) {
-          toast.error('Vui lòng nhập ngày sinh')
-          return
-        }
-        if (new Date(newStudent.dob) >= new Date()) {
-          toast.error('Ngày sinh phải là ngày trong quá khứ')
-          return
-        }
+        if (!trimmedPhone) next.newPhone = 'Vui lòng nhập số điện thoại'
+        else if (!phoneRegex.test(trimmedPhone)) next.newPhone = 'SĐT không hợp lệ (10 chữ số, ví dụ 0912345678 hoặc +84912345678)'
+        if (!newStudent.dob) next.newDob = 'Vui lòng nhập ngày sinh'
+        else if (new Date(newStudent.dob) >= new Date()) next.newDob = 'Ngày sinh phải là ngày trong quá khứ'
       }
     }
 
-    if (requestType === 'UPDATE' && !form.targetEnrollmentId) {
-      toast.error('Vui lòng chọn khóa học cần cập nhật')
-      return
-    }
+    if (requestType === 'UPDATE' && !form.targetEnrollmentId) next.targetEnrollmentId = 'Vui lòng chọn khóa học cần cập nhật'
+    if (!form.swimStyle) next.swimStyle = 'Vui lòng chọn kiểu bơi'
+    if (form.totalQuota && Number(form.totalQuota) < 1) next.totalQuota = 'Tổng số buổi học phải lớn hơn 0'
+    if (form.startDate && form.expireDate && new Date(form.startDate) >= new Date(form.expireDate)) next.expireDate = 'Ngày hết hạn phải sau ngày bắt đầu'
 
-    if (!form.swimStyle) {
-      toast.error('Vui lòng chọn kiểu bơi')
-      return
-    }
-
-    if (form.totalQuota && Number(form.totalQuota) < 1) {
-      toast.error('Tổng số buổi học phải lớn hơn 0')
-      return
-    }
-
-    if (form.startDate && form.expireDate && new Date(form.startDate) >= new Date(form.expireDate)) {
-      toast.error('Ngày hết hạn phải sau ngày bắt đầu')
-      return
-    }
+    setErrors(next)
+    if (Object.keys(next).length > 0) return
 
     setLoading(true)
     try {
       let studentId = form.studentId
 
-      // If CREATE + new student mode → create student first
       if (requestType === 'CREATE' && studentMode === 'new') {
         const created = await createTeacherStudent({
           fullName: newStudent.fullName.trim(),
@@ -424,166 +341,162 @@ function CreateRequestModal({ onClose, onCreated }) {
     }
   }
 
+  const clearErr = (key) => { if (errors[key]) setErrors(er => ({ ...er, [key]: undefined })) }
+
   return (
     <Modal open onClose={onClose} title="Tạo yêu cầu đăng ký" size="lg">
-      <form onSubmit={submit} className="space-y-5">
-        {/* Request type selector */}
+      <form onSubmit={submit} className="space-y-5" noValidate>
         <Field label="Loại yêu cầu" required>
-          <div className="flex gap-2">
+          <div className="flex gap-2" role="group" aria-label="Loại yêu cầu">
             <button
               type="button"
-              onClick={() => {
-                setRequestType('CREATE')
-                setSelectedEnrollment(null)
-              }}
-              className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${requestType === 'CREATE' ? 'bg-pool-50 border-pool-300 text-pool-700 shadow-sm' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}
+              aria-pressed={requestType === 'CREATE'}
+              onClick={() => { setRequestType('CREATE'); setSelectedEnrollment(null) }}
+              className={`flex-1 min-h-11 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all inline-flex items-center justify-center gap-1.5 ${requestType === 'CREATE' ? 'bg-primary-soft border-primary/40 text-primary-soft-text shadow-sm' : 'border-line text-content-muted hover:bg-surface-muted'}`}
             >
-              <Plus className="w-4 h-4 inline mr-1.5" /> Tạo khóa học mới
+              <Plus className="w-4 h-4" aria-hidden="true" /> Tạo khóa học mới
             </button>
             <button
               type="button"
-              onClick={() => {
-                setRequestType('UPDATE')
-                setForm(f => ({ ...f, studentId: '', selectedStudentName: '' }))
-              }}
-              className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${requestType === 'UPDATE' ? 'bg-pool-50 border-pool-300 text-pool-700 shadow-sm' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}
+              aria-pressed={requestType === 'UPDATE'}
+              onClick={() => { setRequestType('UPDATE'); setForm(f => ({ ...f, studentId: '', selectedStudentName: '' })) }}
+              className={`flex-1 min-h-11 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all inline-flex items-center justify-center gap-1.5 ${requestType === 'UPDATE' ? 'bg-primary-soft border-primary/40 text-primary-soft-text shadow-sm' : 'border-line text-content-muted hover:bg-surface-muted'}`}
             >
-              <ListChecks className="w-4 h-4 inline mr-1.5" /> Cập nhật khóa học
+              <ListChecks className="w-4 h-4" aria-hidden="true" /> Cập nhật khóa học
             </button>
           </div>
         </Field>
 
-        {/* ===== CREATE MODE ===== */}
         {requestType === 'CREATE' && (
-          <>
-            <Field label="Học viên" required>
-              <div className="flex gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => setStudentMode('existing')}
-                  className={`flex-1 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${studentMode === 'existing' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}
-                >
-                  <Users className="w-4 h-4 inline mr-1.5" /> Chọn học viên đã có
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStudentMode('new')}
-                  className={`flex-1 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${studentMode === 'new' ? 'bg-violet-50 border-violet-300 text-violet-700' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}
-                >
-                  <UserPlus className="w-4 h-4 inline mr-1.5" /> Tạo học viên mới
-                </button>
-              </div>
+          <Field label="Học viên" required error={errors.student}>
+            <div className="flex gap-2 mb-3" role="group" aria-label="Cách chọn học viên">
+              <button
+                type="button"
+                aria-pressed={studentMode === 'existing'}
+                onClick={() => setStudentMode('existing')}
+                className={`flex-1 min-h-11 px-3 py-2 rounded-xl border text-sm font-medium transition-all inline-flex items-center justify-center gap-1.5 ${studentMode === 'existing' ? 'bg-success-soft border-success/40 text-success-text' : 'border-line text-content-muted hover:bg-surface-muted'}`}
+              >
+                <Users className="w-4 h-4" aria-hidden="true" /> Chọn học viên đã có
+              </button>
+              <button
+                type="button"
+                aria-pressed={studentMode === 'new'}
+                onClick={() => setStudentMode('new')}
+                className={`flex-1 min-h-11 px-3 py-2 rounded-xl border text-sm font-medium transition-all inline-flex items-center justify-center gap-1.5 ${studentMode === 'new' ? 'bg-purple-soft border-purple-text/30 text-purple-text' : 'border-line text-content-muted hover:bg-surface-muted'}`}
+              >
+                <UserPlus className="w-4 h-4" aria-hidden="true" /> Tạo học viên mới
+              </button>
+            </div>
 
-              {studentMode === 'existing' ? (
-                <div className="space-y-2">
-                  <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
-                    <input
-                      placeholder="Tìm theo tên học viên của bạn..."
-                      value={studentSearch}
-                      onChange={(e) => setStudentSearch(e.target.value)}
-                      className={inputCls + ' pl-10'}
-                    />
-                  </div>
-                  <p className="text-xs text-ink-400 flex items-center gap-1">
-                    <Info className="w-3 h-3" /> Chỉ hiển thị học viên mà bạn đang phụ trách
-                  </p>
-                  <div className="border border-ink-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-ink-100/60">
-                    {studentsLoading ? (
-                      <Spinner className="py-4" size={20} />
-                    ) : uniqueStudents.length === 0 ? (
-                      <p className="text-sm text-ink-400 py-4 text-center">Không tìm thấy học viên</p>
-                    ) : (
-                      uniqueStudents.map(s => (
-                        <label
-                          key={s.studentName}
-                          className={`flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-pool-50/50 transition-colors ${form.selectedStudentName === s.studentName ? 'bg-pool-50' : ''}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="radio"
-                              name="student"
-                              checked={form.selectedStudentName === s.studentName}
-                              onChange={() => handleSelectExistingStudent(s)}
-                              className="w-4 h-4 text-pool-600"
-                            />
-                            <div>
-                              <p className="text-sm font-medium text-ink-800">{s.studentName}</p>
-                              <p className="text-xs text-ink-400">{s.studentPhone || ''}</p>
-                            </div>
+            {studentMode === 'existing' ? (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-subtle pointer-events-none" aria-hidden="true" />
+                  <input
+                    placeholder="Tìm theo tên học viên của bạn..."
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    aria-label="Tìm học viên đang phụ trách"
+                    className={inputCls + ' pl-10'}
+                  />
+                </div>
+                <p className="text-xs text-content-subtle flex items-center gap-1">
+                  <Info className="w-3 h-3" aria-hidden="true" /> Chỉ hiển thị học viên mà bạn đang phụ trách
+                </p>
+                <div className="border border-line rounded-xl max-h-40 overflow-y-auto divide-y divide-line/60" role="radiogroup" aria-label="Chọn học viên đã có">
+                  {studentsLoading ? (
+                    <Spinner className="py-4" size={20} />
+                  ) : uniqueStudents.length === 0 ? (
+                    <p className="text-sm text-content-subtle py-4 text-center">Không tìm thấy học viên</p>
+                  ) : (
+                    uniqueStudents.map(s => (
+                      <label
+                        key={s.studentName}
+                        className={`flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-primary-soft/40 transition-colors ${form.selectedStudentName === s.studentName ? 'bg-primary-soft/60' : ''}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="student"
+                            checked={form.selectedStudentName === s.studentName}
+                            onChange={() => handleSelectExistingStudent(s)}
+                            className="w-4 h-4 accent-[var(--color-primary)]"
+                          />
+                          <div>
+                            <p className="text-sm font-medium text-content">{s.studentName}</p>
+                            <p className="text-xs text-content-subtle">{s.studentPhone || ''}</p>
                           </div>
-                          {form.selectedStudentName === s.studentName && resolvingStudentId && (
-                            <span className="text-xs text-pool-600 font-medium animate-pulse">Đang nạp ID...</span>
-                          )}
-                          {form.selectedStudentName === s.studentName && form.studentId && (
-                            <Badge color="green">Đã chọn</Badge>
-                          )}
-                        </label>
-                      ))
-                    )}
-                  </div>
+                        </div>
+                        {form.selectedStudentName === s.studentName && resolvingStudentId && (
+                          <span className="text-xs text-primary-soft-text font-medium">Đang nạp ID...</span>
+                        )}
+                        {form.selectedStudentName === s.studentName && form.studentId && (
+                          <Badge color="green">Đã chọn</Badge>
+                        )}
+                      </label>
+                    ))
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-3 p-3 bg-violet-50/50 rounded-xl border border-violet-200/60">
-                  <Field label="Họ tên" required>
-                    <input
-                      value={newStudent.fullName}
-                      onChange={e => setNewStudent({ ...newStudent, fullName: e.target.value })}
-                      className={inputCls}
-                      placeholder="Nguyễn Văn A"
-                      maxLength={100}
-                    />
-                  </Field>
-                  <Field label="Số điện thoại" required hint="Định dạng: 0xxxxxxxxx (10 số)">
-                    <input
-                      type="tel"
-                      value={newStudent.phoneNumber}
-                      onChange={e => setNewStudent({ ...newStudent, phoneNumber: e.target.value })}
-                      className={inputCls}
-                      placeholder="0912345678"
-                    />
-                  </Field>
-                  <Field label="Ngày sinh" required>
-                    <input
-                      type="date"
-                      value={newStudent.dob}
-                      max={new Date().toISOString().slice(0, 10)}
-                      onChange={e => setNewStudent({ ...newStudent, dob: e.target.value })}
-                      className={inputCls}
-                    />
-                  </Field>
-                </div>
-              )}
-            </Field>
-          </>
+              </div>
+            ) : (
+              <div className="space-y-3 p-3 bg-purple-soft/40 rounded-xl border border-purple-text/20">
+                <Field label="Họ tên" required error={errors.newFullName}>
+                  <input
+                    value={newStudent.fullName}
+                    onChange={e => { setNewStudent({ ...newStudent, fullName: e.target.value }); clearErr('newFullName') }}
+                    className={inputCls}
+                    placeholder="Nguyễn Văn A"
+                    maxLength={100}
+                    autoComplete="name"
+                  />
+                </Field>
+                <Field label="Số điện thoại" required hint="Định dạng: 0xxxxxxxxx (10 số)" error={errors.newPhone}>
+                  <input
+                    type="tel"
+                    value={newStudent.phoneNumber}
+                    onChange={e => { setNewStudent({ ...newStudent, phoneNumber: e.target.value }); clearErr('newPhone') }}
+                    className={inputCls}
+                    placeholder="0912345678"
+                    autoComplete="tel"
+                  />
+                </Field>
+                <Field label="Ngày sinh" required error={errors.newDob}>
+                  <input
+                    type="date"
+                    value={newStudent.dob}
+                    max={getTodayDate()}
+                    onChange={e => { setNewStudent({ ...newStudent, dob: e.target.value }); clearErr('newDob') }}
+                    className={inputCls}
+                  />
+                </Field>
+              </div>
+            )}
+          </Field>
         )}
 
-        {/* ===== UPDATE MODE ===== */}
         {requestType === 'UPDATE' && (
           <>
-            <Field label="Chọn khóa học cần cập nhật" required hint="Chỉ hiển thị học viên của bạn">
+            <Field label="Chọn khóa học cần cập nhật" required hint="Chỉ hiển thị học viên của bạn" error={errors.targetEnrollmentId}>
               <div className="relative mb-2">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-subtle pointer-events-none" aria-hidden="true" />
                 <input
                   placeholder="Tìm theo tên học viên..."
                   value={updateStudentSearch}
-                  onChange={(e) => {
-                    setUpdateStudentSearch(e.target.value)
-                    setSelectedEnrollment(null)
-                  }}
+                  onChange={(e) => { setUpdateStudentSearch(e.target.value); setSelectedEnrollment(null) }}
+                  aria-label="Tìm khóa học cần cập nhật"
                   className={inputCls + ' pl-10'}
                 />
               </div>
-              <div className="border border-ink-200 rounded-xl max-h-52 overflow-y-auto">
+              <div className="border border-line rounded-xl max-h-52 overflow-y-auto" role="radiogroup" aria-label="Chọn khóa học cần cập nhật">
                 {updateLoading ? (
                   <Spinner className="py-4" size={20} />
                 ) : updateEnrollments.length === 0 ? (
-                  <p className="text-sm text-ink-400 py-4 text-center">Không tìm thấy khóa học</p>
+                  <p className="text-sm text-content-subtle py-4 text-center">Không tìm thấy khóa học</p>
                 ) : (
                   updateEnrollments.map(en => (
                     <label
                       key={en.enrollmentId}
-                      className={`flex items-center justify-between px-3 py-3 cursor-pointer hover:bg-pool-50/50 transition-colors border-b border-ink-100/40 last:border-0 ${form.targetEnrollmentId === en.enrollmentId ? 'bg-pool-50' : ''}`}
+                      className={`flex items-center justify-between px-3 py-3 cursor-pointer hover:bg-primary-soft/40 transition-colors border-b border-line/50 last:border-0 ${form.targetEnrollmentId === en.enrollmentId ? 'bg-primary-soft/60' : ''}`}
                     >
                       <div className="flex items-center gap-3">
                         <input
@@ -592,14 +505,14 @@ function CreateRequestModal({ onClose, onCreated }) {
                           value={en.enrollmentId}
                           checked={form.targetEnrollmentId === en.enrollmentId}
                           onChange={() => handleSelectEnrollment(en)}
-                          className="w-4 h-4 text-pool-600"
+                          className="w-4 h-4 accent-[var(--color-primary)]"
                         />
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-medium text-ink-800">{en.studentName}</p>
-                            {en.isGuaranteed && <Shield className="w-3 h-3 text-amber-500" />}
+                            <p className="text-sm font-medium text-content">{en.studentName}</p>
+                            {en.isGuaranteed && <Shield className="w-3 h-3 text-warning-text" aria-hidden="true" />}
                           </div>
-                          <p className="text-xs text-ink-400">{STYLE[en.swimStyle] || en.swimStyle} • {en.attendedSessions}/{en.totalQuota} buổi • Hạn: {en.expireDate || '—'}</p>
+                          <p className="text-xs text-content-subtle">Bơi {STYLE[en.swimStyle] || en.swimStyle} • {en.attendedSessions}/{en.totalQuota} buổi • Hạn: {formatDisplayDate(en.expireDate)}</p>
                         </div>
                       </div>
                       <Badge color={en.status === 'ACTIVE' ? 'green' : en.status === 'COMPLETED' ? 'blue' : 'gray'}>
@@ -611,48 +524,30 @@ function CreateRequestModal({ onClose, onCreated }) {
               </div>
             </Field>
 
-            {/* Show current enrollment info when selected */}
             {selectedEnrollment && (
-              <div className="bg-pool-50/50 border border-pool-200/60 rounded-xl p-4 space-y-2">
-                <p className="text-xs font-semibold text-pool-700 uppercase tracking-wider">Thông tin hiện tại</p>
+              <div className="bg-primary-soft/50 border border-primary/20 rounded-xl p-4 space-y-2">
+                <p className="text-xs font-semibold text-primary-soft-text uppercase tracking-wider">Thông tin hiện tại</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
-                  <div>
-                    <p className="text-xs text-ink-400">Học viên</p>
-                    <p className="font-medium text-ink-800">{selectedEnrollment.studentName}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-ink-400">Kiểu bơi</p>
-                    <p className="font-medium text-ink-800">{STYLE[selectedEnrollment.swimStyle] || selectedEnrollment.swimStyle}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-ink-400">Cam kết</p>
-                    <p className="font-medium text-ink-800">{selectedEnrollment.isGuaranteed ? 'Có' : 'Không'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-ink-400">Tổng buổi</p>
-                    <p className="font-medium text-ink-800">{selectedEnrollment.totalQuota}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-ink-400">Đã học</p>
-                    <p className="font-medium text-ink-800">{selectedEnrollment.attendedSessions} buổi ({selectedEnrollment.progressPercentage || 0}%)</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-ink-400">Còn lại</p>
-                    <p className={`font-medium ${selectedEnrollment.daysRemaining != null && selectedEnrollment.daysRemaining < 5 ? 'text-rose-600' : 'text-ink-800'}`}>
+                  <InfoTile label="Học viên">{selectedEnrollment.studentName}</InfoTile>
+                  <InfoTile label="Kiểu bơi">Bơi {STYLE[selectedEnrollment.swimStyle] || selectedEnrollment.swimStyle}</InfoTile>
+                  <InfoTile label="Cam kết">{selectedEnrollment.isGuaranteed ? 'Có' : 'Không'}</InfoTile>
+                  <InfoTile label="Tổng buổi">{selectedEnrollment.totalQuota}</InfoTile>
+                  <InfoTile label="Đã học">{selectedEnrollment.attendedSessions} buổi ({selectedEnrollment.progressPercentage || 0}%)</InfoTile>
+                  <InfoTile label="Còn lại">
+                    <span className={selectedEnrollment.daysRemaining != null && selectedEnrollment.daysRemaining < 5 ? 'text-danger-text' : 'text-content'}>
                       {selectedEnrollment.daysRemaining != null ? `${selectedEnrollment.daysRemaining} ngày` : '—'}
-                    </p>
-                  </div>
+                    </span>
+                  </InfoTile>
                 </div>
               </div>
             )}
           </>
         )}
 
-        {/* Common fields */}
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Kiểu bơi" required>
-            <select value={form.swimStyle} onChange={e => setForm({ ...form, swimStyle: e.target.value })} className={inputCls}>
-              {Object.entries(STYLE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          <Field label="Kiểu bơi" required error={errors.swimStyle}>
+            <select value={form.swimStyle} onChange={e => { setForm({ ...form, swimStyle: e.target.value }); clearErr('swimStyle') }} className={inputCls}>
+              {Object.entries(STYLE).map(([k, v]) => <option key={k} value={k}>Bơi {v}</option>)}
             </select>
           </Field>
           <Field label="Cam kết" required>
@@ -661,8 +556,8 @@ function CreateRequestModal({ onClose, onCreated }) {
               <option value="1">Có cam kết</option>
             </select>
           </Field>
-          <Field label="Tổng buổi" hint={`Số buổi học (mặc định: ${defaultQuota})`}>
-            <input type="number" min="1" value={form.totalQuota} onChange={e => setForm({ ...form, totalQuota: e.target.value })} className={inputCls} placeholder={String(defaultQuota)} />
+          <Field label="Tổng buổi" hint={`Số buổi học (mặc định: ${defaultQuota})`} error={errors.totalQuota}>
+            <input type="number" min="1" value={form.totalQuota} onChange={e => { setForm({ ...form, totalQuota: e.target.value }); clearErr('totalQuota') }} className={inputCls} placeholder={String(defaultQuota)} />
           </Field>
           <Field label="Ngày bắt đầu" hint={requestType === 'UPDATE' ? 'Không thể đổi ngày bắt đầu khi cập nhật' : 'Mặc định là hôm nay'}>
             <input
@@ -670,18 +565,15 @@ function CreateRequestModal({ onClose, onCreated }) {
               value={form.startDate}
               onChange={e => {
                 const val = e.target.value
-                setForm(f => ({
-                  ...f,
-                  startDate: val,
-                  expireDate: val ? addDays(val, durationDays) : f.expireDate
-                }))
+                setForm(f => ({ ...f, startDate: val, expireDate: val ? addDays(val, durationDays) : f.expireDate }))
+                clearErr('expireDate')
               }}
               disabled={requestType === 'UPDATE'}
-              className={inputCls + (requestType === 'UPDATE' ? ' bg-ink-50/50 text-ink-400' : '')}
+              className={inputCls + (requestType === 'UPDATE' ? ' bg-surface-muted text-content-subtle' : '')}
             />
           </Field>
-          <Field label="Ngày hết hạn" hint={`Mặc định = Ngày bắt đầu + ${durationDays} ngày`}>
-            <input type="date" value={form.expireDate} min={form.startDate || undefined} onChange={e => setForm({ ...form, expireDate: e.target.value })} className={inputCls} />
+          <Field label="Ngày hết hạn" hint={`Mặc định = Ngày bắt đầu + ${durationDays} ngày`} error={errors.expireDate}>
+            <input type="date" value={form.expireDate} min={form.startDate || undefined} onChange={e => { setForm({ ...form, expireDate: e.target.value }); clearErr('expireDate') }} className={inputCls} />
           </Field>
         </div>
 
@@ -691,7 +583,7 @@ function CreateRequestModal({ onClose, onCreated }) {
 
         <div className="flex gap-3 pt-2">
           <Button type="button" variant="outline" onClick={onClose} className="flex-1">Hủy</Button>
-          <Button type="submit" disabled={loading || resolvingStudentId} className="flex-1">
+          <Button type="submit" loading={loading} disabled={resolvingStudentId} className="flex-1">
             {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
           </Button>
         </div>
@@ -709,50 +601,32 @@ function DetailModal({ request, onClose }) {
   return (
     <Modal open onClose={onClose} title="Chi tiết yêu cầu" size="lg">
       <div className="space-y-4">
-        <div className="bg-ink-50/60 rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-ink-900 text-lg">{request.studentName || '—'}</h3>
+        <div className="bg-surface-muted/60 rounded-xl p-4 space-y-3 border border-line">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="font-display font-semibold text-content text-lg">{request.studentName || '—'}</h3>
             <div className="flex items-center gap-2">
               <Badge color={request.requestType === 'CREATE' ? 'blue' : 'purple'}>{TYPE_LABEL[request.requestType]}</Badge>
               <Badge color={STATUS_COLOR[request.status]}>{STATUS_LABEL[request.status]}</Badge>
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-            <div>
-              <p className="text-xs text-ink-400">Kiểu bơi</p>
-              <p className="font-medium text-ink-800">{STYLE[request.swimStyle] || request.swimStyle || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-ink-400">Cam kết</p>
-              <p className="font-medium text-ink-800">{request.isGuaranteed ? 'Có cam kết' : 'Không'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-ink-400">Tổng buổi</p>
-              <p className="font-medium text-ink-800">{displayQuota} buổi {request.totalQuota ? '' : '(mặc định)'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-ink-400">Ngày bắt đầu</p>
-              <p className="font-medium text-ink-800">{formatDisplayDate(displayStart)} {request.startDate ? '' : '(mặc định)'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-ink-400">Ngày hết hạn</p>
-              <p className="font-medium text-ink-800">{formatDisplayDate(displayExpire)} {request.expireDate ? '' : '(mặc định)'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-ink-400">Ngày tạo</p>
-              <p className="font-medium text-ink-800">{request.createdAt ? new Date(request.createdAt).toLocaleDateString('vi-VN') : '—'}</p>
-            </div>
+            <InfoTile label="Kiểu bơi">Bơi {STYLE[request.swimStyle] || request.swimStyle || '—'}</InfoTile>
+            <InfoTile label="Cam kết">{request.isGuaranteed ? 'Có cam kết' : 'Không'}</InfoTile>
+            <InfoTile label="Tổng buổi">{displayQuota} buổi {request.totalQuota ? '' : '(mặc định)'}</InfoTile>
+            <InfoTile label="Ngày bắt đầu">{formatDisplayDate(displayStart)} {request.startDate ? '' : '(mặc định)'}</InfoTile>
+            <InfoTile label="Ngày hết hạn">{formatDisplayDate(displayExpire)} {request.expireDate ? '' : '(mặc định)'}</InfoTile>
+            <InfoTile label="Ngày tạo">{formatDisplayDate(request.createdAt)}</InfoTile>
           </div>
           {request.note && (
             <div className="pt-1">
-              <p className="text-xs text-ink-400">Ghi chú của bạn</p>
-              <p className="text-sm text-ink-700 bg-white/80 rounded-lg px-3 py-2 mt-1">{request.note}</p>
+              <p className="text-xs text-content-subtle">Ghi chú của bạn</p>
+              <p className="text-sm text-content bg-surface rounded-lg px-3 py-2 mt-1 border border-line">{request.note}</p>
             </div>
           )}
           {request.adminNote && (
             <div className="pt-1">
-              <p className="text-xs text-ink-400">Phản hồi từ Admin</p>
-              <p className="text-sm text-ink-700 bg-white/80 rounded-lg px-3 py-2 mt-1">{request.adminNote}</p>
+              <p className="text-xs text-content-subtle">Phản hồi từ Admin</p>
+              <p className="text-sm text-content bg-surface rounded-lg px-3 py-2 mt-1 border border-line">{request.adminNote}</p>
             </div>
           )}
         </div>
@@ -763,4 +637,3 @@ function DetailModal({ request, onClose }) {
     </Modal>
   )
 }
-

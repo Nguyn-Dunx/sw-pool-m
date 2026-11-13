@@ -1,6 +1,48 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
+  /* ===== Aqua Operations — semantic tokens ===== */
+  --color-canvas: #f3f7fb;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #f1f5f9;
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
+  --color-content: #0f172a;
+  --color-content-muted: #475569;
+  --color-content-subtle: #8a99b5;
+
+  --color-primary: #0284c7;
+  --color-primary-strong: #0369a1;
+  --color-primary-soft: #e0f2fe;
+  --color-primary-soft-text: #0369a1;
+  --color-accent: #0d9488;
+  --color-accent-strong: #0f766e;
+  --color-accent-soft: #ccfbf1;
+  --color-accent-soft-text: #0f766e;
+
+  --color-success: #059669;
+  --color-success-soft: #d7f5e5;
+  --color-success-text: #046c4e;
+  --color-warning: #d97706;
+  --color-warning-soft: #fdf0d3;
+  --color-warning-text: #b45309;
+  --color-danger: #e11d48;
+  --color-danger-soft: #ffe4e6;
+  --color-danger-text: #be123c;
+  --color-info: #2563eb;
+  --color-info-soft: #dbeafe;
+  --color-info-text: #1d4ed8;
+  --color-purple-soft: #f3e8ff;
+  --color-purple-text: #7e22ce;
+  --color-danger-action: #e11d48;
+
+  --color-scrim: rgb(4 12 28 / 0.55);
+  --color-ring: rgb(2 132 199 / 0.35);
+
+  /* ===== Legacy scales (light) — giữ để các trang hiện tại chạy nguyên vẹn ===== */
   --color-pool-50: #f0f9ff;
   --color-pool-100: #e0f2fe;
   --color-pool-200: #bae6fd;
@@ -25,8 +67,143 @@
   --color-ink-900: #0f172a;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Be Vietnam Pro", "Inter", ui-sans-serif, system-ui, sans-serif;
+
   --radius-card: 14px;
+
+  --shadow-card: 0 1px 2px rgb(12 74 110 / 0.05), 0 4px 16px -4px rgb(12 74 110 / 0.07);
+  --shadow-pop: 0 4px 12px -2px rgb(12 74 110 / 0.1), 0 16px 40px -12px rgb(12 74 110 / 0.18);
 }
+
+/* ===== Dark mode: đảo semantic tokens + remap legacy scales =====
+   Các trang đang dùng thang màu pool, ink, emerald... tự thích ứng mà không cần sửa class. */
+.dark {
+  --color-canvas: #0b1120;
+  --color-surface: #101b31;
+  --color-surface-raised: #182642;
+  --color-surface-muted: #1b2a47;
+  --color-line: #22345a;
+  --color-line-strong: #33486f;
+  --color-content: #f1f5f9;
+  --color-content-muted: #9fb0ca;
+  --color-content-subtle: #71829e;
+
+  --color-primary: #0284c7;
+  --color-primary-strong: #0369a1;
+  --color-primary-soft: #0e2440;
+  --color-primary-soft-text: #7dd3fc;
+  --color-accent: #14b8a6;
+  --color-accent-strong: #2dd4bf;
+  --color-accent-soft: #042f2e;
+  --color-accent-soft-text: #5eead4;
+
+  --color-success: #10b981;
+  --color-success-soft: #052e22;
+  --color-success-text: #6ee7b7;
+  --color-warning: #f59e0b;
+  --color-warning-soft: #3b2503;
+  --color-warning-text: #fcd34d;
+  --color-danger: #f43f5e;
+  --color-danger-soft: #400b1e;
+  --color-danger-text: #fda4af;
+  --color-info: #3b82f6;
+  --color-info-soft: #0d1b3e;
+  --color-info-text: #93c5fd;
+  --color-purple-soft: #2e1065;
+  --color-purple-text: #c4b5fd;
+  --color-danger-action: #e11d48;
+
+  --color-scrim: rgb(2 6 18 / 0.7);
+  --color-ring: rgb(56 189 248 / 0.4);
+
+  --color-pool-50: #0a1a2f;
+  --color-pool-100: #0e2440;
+  --color-pool-200: #143252;
+  --color-pool-300: #1b4266;
+  --color-pool-400: #38bdf8;
+  --color-pool-500: #0ea5e9;
+  --color-pool-600: #38bdf8;
+  --color-pool-700: #7dd3fc;
+  --color-pool-800: #bae6fd;
+  --color-pool-900: #e0f2fe;
+  --color-pool-950: #f0f9ff;
+
+  --color-ink-50: #0d1526;
+  --color-ink-100: #16203a;
+  --color-ink-200: #22314f;
+  --color-ink-300: #31436a;
+  --color-ink-400: #8494b3;
+  --color-ink-500: #9aa9c7;
+  --color-ink-600: #c2cde3;
+  --color-ink-700: #dce4f2;
+  --color-ink-800: #edf2fa;
+  --color-ink-900: #f8fafc;
+
+  --color-emerald-50: #052e22;
+  --color-emerald-100: #064e3b;
+  --color-emerald-200: #0b7a55;
+  --color-emerald-300: #10b981;
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #d1fae5;
+
+  --color-rose-50: #400b1e;
+  --color-rose-100: #4c0519;
+  --color-rose-200: #9f1239;
+  --color-rose-300: #e11d48;
+  --color-rose-600: #fb7185;
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
+
+  --color-amber-50: #3b1503;
+  --color-amber-100: #451a03;
+  --color-amber-200: #b45309;
+  --color-amber-300: #d97706;
+  --color-amber-600: #fbbf24;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+
+  --color-violet-50: #1e0a3c;
+  --color-violet-100: #2e1065;
+  --color-violet-200: #6d28d9;
+  --color-violet-300: #7c3aed;
+  --color-violet-600: #a78bfa;
+  --color-violet-700: #c4b5fd;
+  --color-violet-800: #ddd6fe;
+  --color-violet-900: #ede9fe;
+
+  --color-blue-50: #0d1b3e;
+  --color-blue-100: #172554;
+  --color-blue-200: #1e40af;
+  --color-blue-300: #2563eb;
+  --color-blue-600: #60a5fa;
+  --color-blue-700: #93c5fd;
+  --color-blue-800: #bfdbfe;
+  --color-blue-900: #dbeafe;
+
+  --color-teal-50: #042f2e;
+  --color-teal-100: #134e4a;
+  --color-teal-200: #0f766e;
+  --color-teal-300: #0d9488;
+  --color-teal-600: #2dd4bf;
+  --color-teal-700: #5eead4;
+  --color-teal-800: #99f6e4;
+  --color-teal-900: #ccfbf1;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px -4px rgb(0 0 0 / 0.35);
+  --shadow-pop: 0 4px 12px -2px rgb(0 0 0 / 0.4), 0 16px 40px -12px rgb(0 0 0 / 0.5);
+}
+
+/* bg-white là surface trong dark; text-white giữ nguyên trắng cho nút/avatar */
+.dark .bg-white { background-color: var(--color-surface); }
+.dark .bg-white\/70 { background-color: color-mix(in oklab, var(--color-surface) 70%, transparent); }
+.dark .bg-white\/80 { background-color: color-mix(in oklab, var(--color-surface) 80%, transparent); }
+.dark .bg-white\/85 { background-color: color-mix(in oklab, var(--color-surface) 85%, transparent); }
+.dark .bg-white\/90 { background-color: color-mix(in oklab, var(--color-surface) 90%, transparent); }
+.dark .bg-white\/95 { background-color: color-mix(in oklab, var(--color-surface) 95%, transparent); }
 
 * { box-sizing: border-box; }
 
@@ -35,27 +212,55 @@ html, body, #root {
   padding: 0;
   min-height: 100dvh;
   font-family: var(--font-sans);
-  background: var(--color-pool-50);
-  color: var(--color-ink-800);
+  background: var(--color-canvas);
+  color: var(--color-content);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+body {
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+}
+
 button { cursor: pointer; }
-button:disabled { cursor: not-allowed; opacity: 0.5; }
+button:disabled { cursor: not-allowed; }
 
 input, select, textarea {
   font-family: inherit;
   font-size: inherit;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* Scrollbar theo palette */
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-pool-200); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-pool-300); }
+::-webkit-scrollbar-thumb { background: var(--color-line-strong); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
+html { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
 
-/* ===== Animations ===== */
+/* ===== Focus ring toàn cục ===== */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-ring);
+  border-color: var(--color-primary);
+}
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+input[aria-invalid="true"]:focus-visible, select[aria-invalid="true"]:focus-visible, textarea[aria-invalid="true"]:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-danger) 25%, transparent);
+  border-color: var(--color-danger);
+}
+
+/* ===== Animations (transform/opacity, tiết chế) ===== */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
@@ -68,96 +273,94 @@ input, select, textarea {
   from { opacity: 0; transform: translateX(20px); }
   to { opacity: 1; transform: translateX(0); }
 }
-@keyframes slideInLeft {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
-}
 @keyframes slideInDown {
   from { opacity: 0; transform: translateY(-12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
 }
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
-@keyframes pulse-soft {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
 }
-@keyframes spin {
-  to { transform: rotate(360deg); }
+@keyframes wave-drift {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
 .animate-fade-in { animation: fadeIn 0.25s ease-out both; }
 .animate-fade-in-up { animation: fadeInUp 0.4s ease-out both; }
 .animate-slide-in-right { animation: slideInRight 0.3s ease-out both; }
 .animate-slide-in-down { animation: slideInDown 0.3s ease-out both; }
-.animate-scale-in { animation: scaleIn 0.25s ease-out both; }
+.animate-scale-in { animation: scaleIn 0.22s ease-out both; }
 .animate-float { animation: float 3s ease-in-out infinite; }
 
-/* Staggered animation delays for lists */
 .stagger-1 { animation-delay: 0.05s; }
 .stagger-2 { animation-delay: 0.1s; }
 .stagger-3 { animation-delay: 0.15s; }
 .stagger-4 { animation-delay: 0.2s; }
 
-/* ===== Glass Effects ===== */
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-.glass-dark {
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(90deg, var(--color-surface-muted) 25%, var(--color-line) 50%, var(--color-surface-muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 8px;
 }
 
-/* ===== Table Polish ===== */
+/* Sóng nước trang trí (login / dashboard header) */
+.water-waves {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.water-waves svg {
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 200%;
+  height: 100%;
+  animation: wave-drift 14s linear infinite;
+}
+.water-waves svg.wave-slow {
+  animation-duration: 22s;
+  animation-direction: reverse;
+  opacity: 0.5;
+}
+
+/* ===== Glass ===== */
+.glass {
+  background: color-mix(in oklab, var(--color-surface) 75%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in oklab, var(--color-line) 60%, transparent);
+}
+
+/* ===== Table ===== */
 table tbody tr {
   transition: background-color 0.15s ease;
 }
 
-/* ===== Focus Ring ===== */
-input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
-  border-color: var(--color-pool-400);
-}
-
-/* ===== Card Hover ===== */
+/* ===== Card hover ===== */
 .card-hover {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .card-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px -5px rgba(14, 165, 233, 0.1), 0 4px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-/* ===== Login Background Animation ===== */
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-.bg-gradient-animated {
-  background-size: 200% 200%;
-  animation: gradient-shift 8s ease infinite;
+  box-shadow: var(--shadow-pop);
 }
 
 /* ===== Tooltip ===== */
-[data-tooltip] {
-  position: relative;
-}
+[data-tooltip] { position: relative; }
 [data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
@@ -166,15 +369,29 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   transform: translateX(-50%) translateY(-4px);
   padding: 4px 10px;
   border-radius: 8px;
-  background: var(--color-ink-800);
-  color: white;
+  background: var(--color-content);
+  color: var(--color-canvas);
   font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 60;
 }
 [data-tooltip]:hover::after {
   opacity: 1;
   transform: translateX(-50%) translateY(-8px);
+}
+
+/* ===== Reduced motion: tắt toàn bộ animation/transition ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .water-waves svg { animation: none; }
+  .skeleton { animation: none; }
 }

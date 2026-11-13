@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FileSpreadsheet, Loader2 } from 'lucide-react'
 
 /**
- * Nút Xuất Excel dùng chung có hiệu ứng loading spinner và style trang nhã
+ * Nút Xuất Excel dùng chung — có trạng thái loading và aria-busy.
  */
 export default function ExportButton({
   onExport,
@@ -25,7 +25,7 @@ export default function ExportButton({
     }
   }
 
-  const sizeCls = size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'
+  const sizeCls = size === 'sm' ? 'min-h-11 px-3.5 text-xs' : 'min-h-11 px-4 text-sm'
 
   return (
     <button
@@ -33,15 +33,16 @@ export default function ExportButton({
       onClick={handleClick}
       disabled={disabled || loading}
       title={title}
-      className={`inline-flex items-center justify-center gap-1.5 font-medium rounded-xl border transition-all duration-200
-        bg-emerald-50/90 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100 hover:border-emerald-300
-        shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
+      aria-busy={loading || undefined}
+      className={`inline-flex items-center justify-center gap-1.5 font-semibold rounded-xl border transition-all duration-200
+        bg-success-soft text-success-text border-success/25 hover:bg-success/15 hover:border-success/40
+        shadow-sm active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
         ${sizeCls} ${className}`}
     >
       {loading ? (
-        <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+        <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
       ) : (
-        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+        <FileSpreadsheet className="w-4 h-4 shrink-0" aria-hidden="true" />
       )}
       <span>{loading ? loadingLabel : label}</span>
     </button>

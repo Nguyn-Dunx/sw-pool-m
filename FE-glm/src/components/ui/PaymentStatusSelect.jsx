@@ -14,9 +14,9 @@ export const PAYMENT_STATUS_OPTIONS = Object.entries(PAYMENT_STATUS_META).map(([
 }))
 
 const selectStyles = {
-  PAID: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  UNPAID: 'border-rose-200 bg-rose-50 text-rose-700',
-  UNKNOWN: 'border-ink-200 bg-ink-50 text-ink-600'
+  PAID: 'border-success/30 bg-success-soft text-success-text',
+  UNPAID: 'border-danger/30 bg-danger-soft text-danger-text',
+  UNKNOWN: 'border-line bg-surface-muted text-content-muted'
 }
 
 export default function PaymentStatusSelect({ value, studentName, onChange, disabled = false }) {
@@ -40,7 +40,7 @@ export default function PaymentStatusSelect({ value, studentName, onChange, disa
         disabled={disabled || saving}
         aria-label={`Trạng thái học phí của ${studentName}`}
         aria-busy={saving}
-        className={`min-h-11 min-w-36 rounded-xl border py-2 pl-3 pr-8 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-pool-400/30 focus:border-pool-400 disabled:cursor-not-allowed disabled:opacity-60 ${selectStyles[currentValue]}`}
+        className={`min-h-11 min-w-36 cursor-pointer rounded-xl border py-2 pl-3 pr-8 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${selectStyles[currentValue]}`}
       >
         {PAYMENT_STATUS_OPTIONS.map(option => (
           <option key={option.value} value={option.value}>{option.label}</option>

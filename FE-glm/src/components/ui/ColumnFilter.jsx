@@ -1,122 +1,172 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Filter, Search, X, Check, RotateCcw } from 'lucide-react'
-import { Badge } from './index'
+import { Badge } from './Badge'
+
+const DROPDOWN_WIDTH = 248
 
 /**
- * ColumnHeaderFilter
- * Component lọc tại header cột chuẩn nghiệp vụ Data Grid
+ * ColumnHeaderFilter — lọc tại header cột.
+ * Dropdown render qua portal nên không bị cắt bởi overflow của bảng;
+ * hỗ trợ Escape, phím mũi tên, trả focus về nút trigger.
  */
 export function ColumnHeaderFilter({
   label,
-  type = 'select', // 'select' | 'search'
+  type = 'select',
   value,
   onChange,
-  options = [], // [{ value: '', label: 'Tất cả' }, { value: 'FROG', label: 'Bơi ếch', badgeColor?: 'blue' }]
+  options = [],
   placeholder = 'Tìm kiếm...',
-  align = 'left', // 'left' | 'right'
+  align = 'left',
   className = ''
 }) {
   const [open, setOpen] = useState(false)
   const [tempSearch, setTempSearch] = useState(value || '')
+  const [pos, setPos] = useState({ left: 0, top: 0, maxHeight: 320 })
+  const triggerRef = useRef(null)
+  const dropdownRef = useRef(null)
   const inputRef = useRef(null)
 
   const isActive = value !== undefined && value !== null && value !== ''
 
-  useEffect(() => {
-    setTempSearch(value || '')
-  }, [value])
+  useEffect(() => { setTempSearch(value || '') }, [value])
+
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const margin = 8
+    let left = align === 'right' ? rect.right - DROPDOWN_WIDTH : rect.left
+    left = Math.max(margin, Math.min(left, window.innerWidth - DROPDOWN_WIDTH - margin))
+    const spaceBelow = window.innerHeight - rect.bottom - margin
+    const spaceAbove = rect.top - margin
+    const openUp = spaceBelow < 220 && spaceAbove > spaceBelow
+    const maxHeight = Math.min(340, openUp ? spaceAbove : spaceBelow)
+    const top = openUp ? Math.max(margin, rect.top - maxHeight - 6) : rect.bottom + 6
+    setPos({ left, top, maxHeight: Math.max(160, maxHeight) })
+  }, [align])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open, updatePosition])
+
+  const close = useCallback((returnFocus = true) => {
+    setOpen(false)
+    if (returnFocus) triggerRef.current?.focus({ preventScroll: true })
+  }, [])
 
   useEffect(() => {
-    if (open && type === 'search') {
-      setTimeout(() => inputRef.current?.focus(), 50)
+    if (!open) return
+    const handleMouseDown = (e) => {
+      if (triggerRef.current?.contains(e.target) || dropdownRef.current?.contains(e.target)) return
+      setOpen(false)
     }
-  }, [open, type])
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        close()
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('keydown', handleKeyDown)
+    const focusTarget = type === 'search' ? inputRef.current : dropdownRef.current?.querySelector('[data-filter-option]')
+    focusTarget?.focus({ preventScroll: true })
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open, type, close])
 
   const handleSelectOption = (optVal) => {
     onChange(optVal)
-    setOpen(false)
+    close()
   }
 
   const handleSearchSubmit = (e) => {
     e?.preventDefault()
     onChange(tempSearch.trim())
-    setOpen(false)
+    close()
   }
 
   const handleClear = (e) => {
     e?.stopPropagation()
     onChange('')
     setTempSearch('')
-    setOpen(false)
+    close()
   }
 
-  return (
-    <div className={`relative inline-flex items-center gap-1.5 select-none ${className}`}>
-      {/* Tên cột */}
-      <span className={`font-semibold transition-colors ${isActive ? 'text-pool-700 font-bold' : 'text-ink-600'}`}>
-        {label}
-      </span>
+  const handleDropdownKeyDown = (e) => {
+    if (type === 'search') return
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
+    const items = Array.from(dropdownRef.current.querySelectorAll('[data-filter-option]'))
+    if (items.length === 0) return
+    e.preventDefault()
+    const idx = items.indexOf(document.activeElement)
+    let next = 0
+    if (e.key === 'ArrowDown') next = idx < items.length - 1 ? idx + 1 : 0
+    else if (e.key === 'ArrowUp') next = idx > 0 ? idx - 1 : items.length - 1
+    else if (e.key === 'End') next = items.length - 1
+    items[next].focus()
+  }
 
-      {/* Nút trigger icon lọc */}
+  const dropdownId = `column-filter-${label.replace(/\s+/g, '-').toLowerCase()}`
+
+  return (
+    <div className={`relative inline-flex items-center select-none ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          setOpen(!open)
-        }}
-        className={`p-1 rounded-md transition-all duration-150 flex items-center justify-center relative ${
-          isActive
-            ? 'bg-pool-100/80 text-pool-700 ring-1 ring-pool-300 shadow-xs'
-            : 'text-ink-400 hover:text-ink-700 hover:bg-ink-100/70'
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? dropdownId : undefined}
+        aria-label={`Lọc theo ${label}${isActive ? ' (đang lọc)' : ''}`}
+        title={`Lọc theo ${label}${isActive ? ' (đang lọc)' : ''}`}
+        className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 -mx-2 font-semibold transition-colors ${
+          isActive ? 'text-primary-soft-text' : 'text-content-muted hover:text-content hover:bg-surface-muted'
         }`}
-        title={`Lọc theo ${label}${isActive ? ' (Đang lọc)' : ''}`}
       >
-        {type === 'search' ? (
-          <Search className="w-3.5 h-3.5" />
-        ) : (
-          <Filter className="w-3.5 h-3.5" />
-        )}
-        {isActive && (
-          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-pool-600 ring-2 ring-white animate-pulse" />
-        )}
+        <span>{label}</span>
+        <span className={`relative inline-flex h-6 w-6 items-center justify-center rounded-md ${isActive ? 'bg-primary-soft text-primary-soft-text' : 'text-content-subtle'}`}>
+          {type === 'search' ? <Search className="w-3.5 h-3.5" aria-hidden="true" /> : <Filter className="w-3.5 h-3.5" aria-hidden="true" />}
+          {isActive && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary ring-2 ring-surface" aria-hidden="true" />}
+        </span>
       </button>
 
-      {/* Dropdown Menu Popup */}
-      {open && (
-        <>
-          <div
-            className="fixed inset-0 z-30 cursor-default"
-            onClick={(e) => {
-              e.stopPropagation()
-              setOpen(false)
-            }}
-          />
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          id={dropdownId}
+          role="dialog"
+          aria-label={`Lọc theo ${label}`}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={handleDropdownKeyDown}
+          style={{ left: pos.left, top: pos.top, width: DROPDOWN_WIDTH, maxHeight: pos.maxHeight }}
+          className="fixed z-[60] flex flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-pop animate-scale-in text-content"
+        >
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-line shrink-0">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-content-subtle">Lọc {label}</span>
+            {isActive && (
+              <button
+                type="button"
+                onClick={handleClear}
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold text-primary-soft-text hover:bg-primary-soft transition-colors"
+              >
+                <RotateCcw className="w-3 h-3" aria-hidden="true" /> Đặt lại
+              </button>
+            )}
+          </div>
 
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className={`absolute top-full mt-1.5 z-40 bg-white rounded-xl shadow-xl border border-ink-100/90 py-2 min-w-[210px] animate-scale-in text-ink-800 ${
-              align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'
-            }`}
-          >
-            {/* Header của Filter Popup */}
-            <div className="flex items-center justify-between px-3 pb-2 mb-1 border-b border-ink-100/60">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-ink-400">
-                Lọc {label}
-              </span>
-              {isActive && (
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="text-[11px] font-semibold text-pool-600 hover:text-pool-800 hover:underline flex items-center gap-1"
-                >
-                  <RotateCcw className="w-2.5 h-2.5" /> Đặt lại
-                </button>
-              )}
-            </div>
-
-            {/* Content: Kiểu Search */}
+          <div className="overflow-y-auto">
             {type === 'search' ? (
-              <form onSubmit={handleSearchSubmit} className="p-2 space-y-2">
+              <form onSubmit={handleSearchSubmit} className="p-2.5 space-y-2">
                 <div className="relative">
                   <input
                     ref={inputRef}
@@ -124,50 +174,49 @@ export function ColumnHeaderFilter({
                     value={tempSearch}
                     onChange={(e) => setTempSearch(e.target.value)}
                     placeholder={placeholder}
-                    className="w-full px-3 py-1.5 pr-7 text-xs rounded-lg border border-ink-200 focus:outline-none focus:ring-2 focus:ring-pool-400/40 focus:border-pool-400"
+                    aria-label={`Tìm theo ${label}`}
+                    className="w-full min-h-11 px-3 py-2 pr-9 text-sm rounded-lg border border-line bg-surface text-content placeholder-content-subtle"
                   />
                   {tempSearch && (
                     <button
                       type="button"
                       onClick={() => setTempSearch('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600"
+                      aria-label="Xóa từ khóa"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-content-subtle hover:text-content"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" aria-hidden="true" />
                     </button>
                   )}
                 </div>
                 <div className="flex items-center justify-end gap-1.5 pt-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      setTempSearch('')
-                      onChange('')
-                      setOpen(false)
-                    }}
-                    className="px-2.5 py-1 text-xs text-ink-500 hover:bg-ink-50 rounded-md font-medium"
+                    onClick={() => { setTempSearch(''); onChange(''); close() }}
+                    className="min-h-11 px-3 text-xs text-content-muted hover:bg-surface-muted rounded-lg font-medium transition-colors"
                   >
                     Xóa
                   </button>
                   <button
                     type="submit"
-                    className="px-3 py-1 text-xs bg-pool-600 text-white rounded-md hover:bg-pool-700 font-semibold shadow-xs"
+                    className="min-h-11 px-4 text-xs bg-primary-strong text-white rounded-lg hover:bg-primary-strong/90 font-semibold shadow-sm transition-colors"
                   >
                     Áp dụng
                   </button>
                 </div>
               </form>
             ) : (
-              /* Content: Kiểu Chọn Options (Select/Radio) */
-              <div className="max-h-60 overflow-y-auto py-0.5">
+              <div className="py-1">
                 <button
                   type="button"
+                  data-filter-option
                   onClick={() => handleSelectOption('')}
-                  className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left hover:bg-pool-50/70 transition-colors font-medium ${
-                    !isActive ? 'text-pool-700 font-bold bg-pool-50/40' : 'text-ink-600'
+                  aria-pressed={!isActive}
+                  className={`w-full flex min-h-11 items-center justify-between px-3 py-2 text-sm text-left hover:bg-primary-soft/60 transition-colors font-medium ${
+                    !isActive ? 'text-primary-soft-text font-bold bg-primary-soft/40' : 'text-content-muted'
                   }`}
                 >
                   <span>Tất cả</span>
-                  {!isActive && <Check className="w-3.5 h-3.5 text-pool-600" />}
+                  {!isActive && <Check className="w-4 h-4 text-primary" aria-hidden="true" />}
                 </button>
 
                 {options.map((opt) => {
@@ -176,73 +225,70 @@ export function ColumnHeaderFilter({
                     <button
                       key={String(opt.value)}
                       type="button"
+                      data-filter-option
                       onClick={() => handleSelectOption(opt.value)}
-                      className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left hover:bg-pool-50/70 transition-colors ${
-                        isSelected ? 'text-pool-700 font-bold bg-pool-50/50' : 'text-ink-700'
+                      aria-pressed={isSelected}
+                      className={`w-full flex min-h-11 items-center justify-between gap-2 px-3 py-2 text-sm text-left hover:bg-primary-soft/60 transition-colors ${
+                        isSelected ? 'text-primary-soft-text font-bold bg-primary-soft/40' : 'text-content'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-2 min-w-0">
                         {opt.badgeColor ? (
-                          <Badge color={opt.badgeColor} className="text-[10px] py-0 px-1.5">
-                            {opt.label}
-                          </Badge>
+                          <Badge color={opt.badgeColor}>{opt.label}</Badge>
                         ) : (
-                          <span>{opt.label}</span>
+                          <span className="truncate">{opt.label}</span>
                         )}
-                        {opt.description && (
-                          <span className="text-[10px] text-ink-400">({opt.description})</span>
-                        )}
-                      </div>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-pool-600 shrink-0" />}
+                        {opt.description && <span className="text-[11px] text-content-subtle shrink-0">({opt.description})</span>}
+                      </span>
+                      {isSelected && <Check className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />}
                     </button>
                   )
                 })}
               </div>
             )}
           </div>
-        </>
+        </div>,
+        document.body
       )}
     </div>
   )
 }
 
 /**
- * ActiveFilterChips
- * Thanh hiển thị các bộ lọc đang kích hoạt kèm nút xóa nhanh
+ * ActiveFilterChips — các bộ lọc đang kích hoạt kèm nút xóa nhanh.
  */
 export function ActiveFilterChips({ filters = [], onClearAll, className = '' }) {
   const activeList = filters.filter((f) => f.value !== undefined && f.value !== null && f.value !== '')
-
   if (activeList.length === 0) return null
 
   return (
-    <div className={`flex items-center flex-wrap gap-2 py-2 px-3 bg-pool-50/50 rounded-xl border border-pool-100 text-xs animate-fade-in ${className}`}>
-      <span className="font-semibold text-pool-800 flex items-center gap-1">
-        <Filter className="w-3 h-3 text-pool-600" /> Đang lọc:
+    <div className={`flex items-center flex-wrap gap-2 py-2 px-3 bg-primary-soft/50 rounded-xl border border-primary/15 text-xs animate-fade-in ${className}`}>
+      <span className="font-semibold text-primary-soft-text flex items-center gap-1">
+        <Filter className="w-3 h-3" aria-hidden="true" /> Đang lọc:
       </span>
       {activeList.map((f, idx) => (
         <span
           key={idx}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-pool-200 text-ink-700 shadow-xs"
+          className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg bg-surface border border-line text-content shadow-sm"
         >
-          <span className="text-ink-400 font-medium">{f.label}:</span>
-          <span className="font-semibold text-pool-800">{f.displayValue || f.value}</span>
+          <span className="text-content-subtle font-medium">{f.label}:</span>
+          <span className="font-semibold text-primary-soft-text">{f.displayValue || f.value}</span>
           <button
             type="button"
             onClick={f.onRemove}
-            className="p-0.5 rounded-full hover:bg-rose-50 hover:text-rose-600 text-ink-400 transition-colors ml-0.5"
-            title="Xóa bộ lọc này"
+            aria-label={`Xóa bộ lọc ${f.label}`}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-danger-soft hover:text-danger-text text-content-subtle transition-colors"
           >
-            <X className="w-3 h-3" />
+            <X className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
         </span>
       ))}
       <button
         type="button"
         onClick={onClearAll}
-        className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline ml-auto flex items-center gap-1"
+        className="min-h-8 inline-flex items-center gap-1 rounded-lg px-2 text-[11px] font-semibold text-danger-text hover:bg-danger-soft ml-auto transition-colors"
       >
-        <RotateCcw className="w-3 h-3" /> Xóa tất cả
+        <RotateCcw className="w-3 h-3" aria-hidden="true" /> Xóa tất cả
       </button>
     </div>
   )

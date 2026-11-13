@@ -19,7 +19,8 @@ export default defineConfig({
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-charts': ['recharts'],
           'vendor-icons': ['lucide-react'],
-          'vendor-utils': ['axios', 'zustand']
+          'vendor-utils': ['axios', 'zustand'],
+          'vendor-motion': ['gsap', '@gsap/react']
         }
       }
     }
